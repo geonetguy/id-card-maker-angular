@@ -23,6 +23,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from PIL import Image
 
@@ -113,6 +114,7 @@ class GenerateIn(BaseModel):
 class GenerateOut(BaseModel):
     filename: str
     path: str
+    output_dir: str
 
 
 class GenerateBatchIn(BaseModel):
@@ -150,6 +152,19 @@ class ChooseOutputDirIn(BaseModel):
 
 class ChooseOutputDirOut(BaseModel):
     output_dir: Optional[str] = None
+
+
+class DownloadIn(BaseModel):
+    output_dir: Optional[str] = None
+    filename: str = Field(..., min_length=1)
+
+
+class OpenPathIn(BaseModel):
+    path: str = Field(..., min_length=1)
+
+
+class OpenPathOut(BaseModel):
+    ok: bool
 
 
 class SMTPConfigIn(BaseModel):
@@ -265,13 +280,74 @@ def generate(body: GenerateIn) -> GenerateOut:
         out_path: Path = next_available(out_dir / filename)
 
         canvas.convert("RGB").save(out_path, format="PNG")
-        return GenerateOut(filename=out_path.name, path=str(out_path))
+        return GenerateOut(filename=out_path.name, path=str(out_path), output_dir=str(out_dir))
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail="internal_error") from e
+
+
+@app.post("/download")
+def download(body: DownloadIn):
+    """
+    Download a generated PNG.
+
+    Safety: file access is restricted to the provided output_dir (or default output dir).
+    """
+    out_dir = Path(body.output_dir).expanduser() if body.output_dir else _default_output_dir()
+    try:
+        out_dir = out_dir.resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid_output_dir")
+
+    filename = safe_filename(Path(body.filename).stem) + Path(body.filename).suffix
+    if not filename.lower().endswith(".png"):
+        filename = filename + ".png"
+
+    path = (out_dir / filename)
+    try:
+        path = path.resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid_path")
+
+    if out_dir not in path.parents and path != out_dir:
+        raise HTTPException(status_code=400, detail="path_outside_output_dir")
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="not_found")
+
+    return FileResponse(path, media_type="image/png", filename=path.name)
+
+
+@app.post("/open-path", response_model=OpenPathOut)
+def open_path(body: OpenPathIn) -> OpenPathOut:
+    """
+    Best-effort open a file or folder in the OS file manager.
+    """
+    try:
+        p = Path(body.path).expanduser()
+        if not p.exists():
+            raise HTTPException(status_code=404, detail="not_found")
+
+        # Windows supports os.startfile; other platforms best-effort.
+        if hasattr(os, "startfile"):
+            os.startfile(str(p))  # type: ignore[attr-defined]
+            return OpenPathOut(ok=True)
+
+        import subprocess
+        import sys
+
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(p)])
+        else:
+            subprocess.Popen(["xdg-open", str(p)])
+        return OpenPathOut(ok=True)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="internal_error")
 
 
 @app.post("/generate-batch", response_model=GenerateBatchOut)

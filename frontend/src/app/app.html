@@ -76,9 +76,19 @@
 
       <div class="actions">
         <button class="btn" (click)="refreshPreview()" [disabled]="isLoading() || !templateBase64()">Refresh preview</button>
+        <button class="btn" (click)="generateOne()" [disabled]="isLoading() || !templateBase64() || !idNumber().trim()">
+          Generate card
+        </button>
         <button class="btn btn--secondary" (click)="saveMember()" [disabled]="isLoading()">Save member</button>
         <button class="btn btn--ghost" (click)="newMember()" [disabled]="isLoading()">New</button>
         <span class="status" *ngIf="isLoading()">Rendering…</span>
+      </div>
+
+      <div class="actions" *ngIf="generateStatus() || lastGenerated()">
+        <button class="btn btn--secondary" (click)="downloadLast()" [disabled]="!lastGenerated()">Download PNG</button>
+        <button class="btn btn--secondary" (click)="openGenerated('file')" [disabled]="!lastGenerated()">Open file</button>
+        <button class="btn btn--secondary" (click)="openGenerated('folder')" [disabled]="!lastGenerated()">Open folder</button>
+        <span class="status" *ngIf="generateStatus()">{{ generateStatus() }}</span>
       </div>
 
       <div class="callouts" *ngIf="error() || warning()">

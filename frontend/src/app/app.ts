@@ -20,8 +20,10 @@ type GenerateBatchOut = {
   results: GenerateBatchResult[];
 };
 
+type GenerateOut = { filename: string; path: string; output_dir: string };
 type ConfigOut = { output_dir?: string | null };
 type ChooseOutputDirOut = { output_dir?: string | null };
+type OpenPathOut = { ok: boolean };
 
 @Component({
   selector: 'app-root',
@@ -52,6 +54,9 @@ export class App {
 
   protected readonly batchStatus = signal<string | null>(null);
   protected readonly batchResult = signal<GenerateBatchOut | null>(null);
+
+  protected readonly generateStatus = signal<string | null>(null);
+  protected readonly lastGenerated = signal<GenerateOut | null>(null);
 
   private previewDebounceTimer: number | null = null;
 
@@ -220,6 +225,88 @@ export class App {
       this.batchStatus.set(String(msg));
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  protected async generateOne(): Promise<void> {
+    this.error.set(null);
+    this.generateStatus.set(null);
+    this.lastGenerated.set(null);
+
+    const template = this.templateBase64();
+    if (!template) {
+      this.error.set('Choose a template image first.');
+      return;
+    }
+
+    const idNumber = this.idNumber().trim();
+    if (!idNumber) {
+      this.error.set('ID Number is required.');
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.generateStatus.set('Generating card...');
+    try {
+      const payload = {
+        member: {
+          name: this.name().trim(),
+          id_number: idNumber,
+          date: this.date().trim(),
+          email: this.email().trim(),
+        },
+        template_base64: template,
+        signature_base64: this.signatureBase64(),
+        output_dir: this.outputDir().trim() || null,
+      };
+
+      const resp = await firstValueFrom(
+        this.http.post<GenerateOut>(`${this.apiBase}/generate`, payload)
+      );
+      this.lastGenerated.set(resp);
+      this.generateStatus.set(`Saved: ${resp.filename}`);
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to generate card.';
+      this.error.set(String(msg));
+      this.generateStatus.set(String(msg));
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  protected async downloadLast(): Promise<void> {
+    const last = this.lastGenerated();
+    if (!last) return;
+
+    try {
+      const payload = { output_dir: last.output_dir, filename: last.filename };
+      const resp = await firstValueFrom(
+        this.http.post(`${this.apiBase}/download`, payload, { responseType: 'blob' })
+      );
+      const url = URL.createObjectURL(resp);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = last.filename || 'idcard.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to download file.';
+      this.error.set(String(msg));
+    }
+  }
+
+  protected async openGenerated(kind: 'file' | 'folder'): Promise<void> {
+    const last = this.lastGenerated();
+    if (!last) return;
+
+    const path = kind === 'folder' ? last.output_dir : last.path;
+    try {
+      await firstValueFrom(this.http.post<OpenPathOut>(`${this.apiBase}/open-path`, { path }));
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to open path.';
+      this.error.set(String(msg));
     }
   }
 

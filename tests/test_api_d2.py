@@ -111,6 +111,39 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
                 pass
 
 
+def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) -> None:
+    out_dir = project_output_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    before = {p.name for p in out_dir.glob("*.png")}
+    try:
+        r = client.post(
+            "/generate",
+            json={
+                "member": {"name": "Test", "id_number": "SINGLE-1", "date": "2026-04-19", "email": "x@example.com"},
+                "template_base64": _png_b64(),
+                "signature_base64": None,
+                "output_dir": str(out_dir),
+            },
+        )
+        assert r.status_code == 200
+        payload = r.json()
+        assert payload["filename"].endswith(".png")
+        assert payload["path"]
+        assert payload["output_dir"] == str(out_dir)
+
+        after = {p.name for p in out_dir.glob("*.png")}
+        created = sorted(after - before)
+        assert any(name.startswith("SINGLE-1") and name.endswith(".png") for name in created)
+    finally:
+        after = {p.name for p in out_dir.glob("*.png")}
+        for name in (after - before):
+            try:
+                (out_dir / name).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
 def test_email_requires_smtp_fields(client: TestClient) -> None:
     r = client.post(
         "/email",
