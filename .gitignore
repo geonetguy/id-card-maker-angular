@@ -20,6 +20,18 @@ dist/
 pip-wheel-metadata/
 
 # =========================
+# Build artifacts
+# =========================
+build/
+dist/
+.briefcase/
+
+# Platform builds
+windows/
+macOS/
+linux/
+
+# =========================
 # Beeware / Toga / Briefcase
 # =========================
 # Build artifacts
@@ -110,6 +122,12 @@ yarn-error.log*
 coverage/
 htmlcov/
 .pytest_cache/
+
+# =========================
+# Logs (DEV ONLY)
+# =========================
+logs/
+*.log
 
 # =========================
 # Misc
