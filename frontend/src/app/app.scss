@@ -47,6 +47,12 @@
   align-items: start;
 }
 
+.rightCol {
+  display: grid;
+  gap: var(--uip-space-6);
+  align-items: start;
+}
+
 .panel {
   background: var(--uip-surface);
   border: 1px solid var(--uip-border);
@@ -339,7 +345,13 @@
 }
 
 .panel--table {
-  margin-top: 16px;
+  margin-top: 0;
+}
+
+.statusStack {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .tableWrap {

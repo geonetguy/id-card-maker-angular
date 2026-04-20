@@ -154,83 +154,86 @@
         </div>
       </div>
 
-      <div class="actions">
-        <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || members().length === 0">
-          Email batch
-        </button>
-        <span class="status" *ngIf="emailStatus()">{{ emailStatus() }}</span>
-      </div>
-
-      <div class="batchSummary" *ngIf="emailResult()">
-        <div class="batchSummary__title">Last email</div>
-        <div class="batchSummary__line">
-          Total: {{ emailResult()!.total }} &middot; Sent: {{ emailResult()!.sent }} &middot; Skipped: {{ emailResult()!.skipped }} &middot; Errors: {{ emailResult()!.errors }}
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !templateBase64() || members().length === 0">
-          Generate batch
-        </button>
-        <span class="status" *ngIf="batchStatus()">{{ batchStatus() }}</span>
-      </div>
-
       <div class="note">
         Start API:
         <code>py -3.13 -m uvicorn idcard_maker.api_app:app --host 127.0.0.1 --port 8000</code>
       </div>
     </section>
 
-    <section class="panel panel--preview">
-      <h2>Preview</h2>
-      <div class="preview" *ngIf="previewSrc(); else noPreview">
-        <img class="preview__img" [src]="previewSrc()!" alt="ID card preview" />
-      </div>
-      <ng-template #noPreview>
-        <div class="empty">Choose a template to render a preview.</div>
-      </ng-template>
-    </section>
+    <div class="rightCol">
+      <section class="panel panel--preview">
+        <h2>Preview</h2>
+        <div class="preview" *ngIf="previewSrc(); else noPreview">
+          <img class="preview__img" [src]="previewSrc()!" alt="ID card preview" />
+        </div>
+        <ng-template #noPreview>
+          <div class="empty">Choose a template to render a preview.</div>
+        </ng-template>
+      </section>
+
+      <section class="panel panel--table">
+        <h2>Members ({{ members().length }})</h2>
+
+        <div class="actions">
+          <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || members().length === 0">
+            Email batch
+          </button>
+          <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !templateBase64() || members().length === 0">
+            Generate batch
+          </button>
+        </div>
+
+        <div class="statusStack" *ngIf="emailStatus() || batchStatus()">
+          <div class="status" *ngIf="emailStatus()">Email: {{ emailStatus() }}</div>
+          <div class="status" *ngIf="batchStatus()">Batch: {{ batchStatus() }}</div>
+        </div>
+
+        <div class="batchSummary" *ngIf="emailResult()">
+          <div class="batchSummary__title">Last email</div>
+          <div class="batchSummary__line">
+            Total: {{ emailResult()!.total }} &middot; Sent: {{ emailResult()!.sent }} &middot; Skipped: {{ emailResult()!.skipped }} &middot; Errors: {{ emailResult()!.errors }}
+          </div>
+        </div>
+
+        <div class="batchSummary" *ngIf="batchResult()">
+          <div class="batchSummary__title">Last batch</div>
+          <div class="batchSummary__line">
+            Total: {{ batchResult()!.total }} &middot; OK: {{ batchResult()!.ok }} &middot; Skipped: {{ batchResult()!.skipped }} &middot; Errors: {{ batchResult()!.errors }}
+          </div>
+        </div>
+
+        <div class="tableWrap" *ngIf="members().length; else emptyTable">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>ID Number</th>
+                <th>Date</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of members(); track trackIndex($index)) {
+                <tr
+                  class="row"
+                  [class.row--selected]="selectedIndex() === $index"
+                  (click)="selectRow($index)"
+                >
+                  <td>{{ m.name }}</td>
+                  <td>{{ m.id_number }}</td>
+                  <td>{{ m.date }}</td>
+                  <td>{{ m.email }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <ng-template #emptyTable>
+          <div class="empty">Upload a CSV or add a member to populate the table.</div>
+        </ng-template>
+      </section>
+    </div>
   </div>
-
-  <section class="panel panel--table">
-    <h2>Members ({{ members().length }})</h2>
-    <div class="tableWrap" *ngIf="members().length; else emptyTable">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>ID Number</th>
-            <th>Date</th>
-            <th>Email</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (m of members(); track trackIndex($index)) {
-            <tr
-              class="row"
-              [class.row--selected]="selectedIndex() === $index"
-              (click)="selectRow($index)"
-            >
-              <td>{{ m.name }}</td>
-              <td>{{ m.id_number }}</td>
-              <td>{{ m.date }}</td>
-              <td>{{ m.email }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    <ng-template #emptyTable>
-      <div class="empty">Upload a CSV or add a member to populate the table.</div>
-    </ng-template>
-
-    <div class="batchSummary" *ngIf="batchResult()">
-      <div class="batchSummary__title">Last batch</div>
-      <div class="batchSummary__line">
-        Total: {{ batchResult()!.total }} &middot; OK: {{ batchResult()!.ok }} &middot; Skipped: {{ batchResult()!.skipped }} &middot; Errors: {{ batchResult()!.errors }}
-      </div>
-    </div>
-  </section>
 </div>
 
 <div class="modalOverlay" *ngIf="settingsOpen()">
