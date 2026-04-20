@@ -73,7 +73,8 @@
 }
 
 .panel h2 {
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 800;
   margin: 10px 0 10px;
   color: var(--uip-text);
 }
@@ -356,6 +357,10 @@
   display: grid;
   gap: 4px;
   margin-top: 8px;
+}
+
+.tableToolbar {
+  margin-bottom: var(--uip-space-4);
 }
 
 .tableWrap {

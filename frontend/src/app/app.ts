@@ -147,6 +147,16 @@ export class App {
     return chosen.map(({ name, id_number, date, email }) => ({ name, id_number, date, email }));
   });
 
+  protected readonly outputFolder = computed(() => {
+    const direct = this.outputDir().trim();
+    if (direct) return direct;
+    const batch = this.batchResult();
+    if (batch?.output_dir) return batch.output_dir;
+    return '';
+  });
+
+  protected readonly hasOutputFolder = computed(() => this.outputFolder().trim().length > 0);
+
   protected readonly hasActiveEmailCreds = computed(() => {
     const emailAddr = this.currentEmail().trim();
     const password = this.currentPassword();
@@ -611,6 +621,48 @@ export class App {
       const msg = e?.error?.detail || e?.message || 'Failed to open path.';
       this.error.set(String(msg));
     }
+  }
+
+  protected async openOutputFolder(): Promise<void> {
+    this.error.set(null);
+    const folder = this.outputFolder().trim();
+    if (!folder) {
+      this.error.set('Set an output folder first (or generate cards to establish one).');
+      return;
+    }
+    try {
+      await firstValueFrom(this.http.post<OpenPathOut>(`${this.apiBase}/open-path`, { path: folder }));
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to open folder.';
+      this.error.set(String(msg));
+    }
+  }
+
+  protected exportCsv(): void {
+    const rows = this.members();
+    const headers = ['name', 'id_number', 'date', 'email'];
+
+    const esc = (v: string) => {
+      const s = (v ?? '').toString();
+      if (/[\",\n\r]/.test(s)) return `"${s.replace(/\"/g, '""')}"`;
+      return s;
+    };
+
+    const lines: string[] = [];
+    lines.push(headers.join(','));
+    for (const r of rows) {
+      lines.push([r.name, r.id_number, r.date, r.email].map(esc).join(','));
+    }
+
+    const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'members.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   protected onSmtpChange(): void {}

@@ -132,37 +132,32 @@
       <section class="panel panel--table">
         <h2>Members ({{ members().length }})</h2>
 
-        <div class="actions">
-          <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">
-            Add member
-          </button>
-        </div>
-
-        <div class="actions">
-          <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedCount() === 0">
-            Email card(s)
-          </button>
-          <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || selectedCount() === 0">
-            Generate card(s)
-          </button>
-        </div>
-
-        <div class="statusStack" *ngIf="emailStatus() || batchStatus()">
-          <div class="status" *ngIf="emailStatus()">Email: {{ emailStatus() }}</div>
-          <div class="status" *ngIf="batchStatus()">Batch: {{ batchStatus() }}</div>
-        </div>
-
-        <div class="batchSummary" *ngIf="emailResult()">
-          <div class="batchSummary__title">Last email</div>
-          <div class="batchSummary__line">
-            Total: {{ emailResult()!.total }} &middot; Sent: {{ emailResult()!.sent }} &middot; Skipped: {{ emailResult()!.skipped }} &middot; Errors: {{ emailResult()!.errors }}
+        <div class="tableToolbar">
+          <div class="actions">
+            <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">Add member</button>
+            <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0">Export CSV</button>
+            <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()">Open folder</button>
+            <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || selectedCount() === 0">Generate card(s)</button>
+            <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedCount() === 0">Email card(s)</button>
           </div>
-        </div>
 
-        <div class="batchSummary" *ngIf="batchResult()">
-          <div class="batchSummary__title">Last batch</div>
-          <div class="batchSummary__line">
-            Total: {{ batchResult()!.total }} &middot; OK: {{ batchResult()!.ok }} &middot; Skipped: {{ batchResult()!.skipped }} &middot; Errors: {{ batchResult()!.errors }}
+          <div class="statusStack" *ngIf="emailStatus() || batchStatus()">
+            <div class="status" *ngIf="emailStatus()">Email: {{ emailStatus() }}</div>
+            <div class="status" *ngIf="batchStatus()">Batch: {{ batchStatus() }}</div>
+          </div>
+
+          <div class="batchSummary" *ngIf="emailResult()">
+            <div class="batchSummary__title">Last email</div>
+            <div class="batchSummary__line">
+              Total: {{ emailResult()!.total }} &middot; Sent: {{ emailResult()!.sent }} &middot; Skipped: {{ emailResult()!.skipped }} &middot; Errors: {{ emailResult()!.errors }}
+            </div>
+          </div>
+
+          <div class="batchSummary" *ngIf="batchResult()">
+            <div class="batchSummary__title">Last batch</div>
+            <div class="batchSummary__line">
+              Total: {{ batchResult()!.total }} &middot; OK: {{ batchResult()!.ok }} &middot; Skipped: {{ batchResult()!.skipped }} &middot; Errors: {{ batchResult()!.errors }}
+            </div>
           </div>
         </div>
 
