@@ -263,6 +263,10 @@
     </div>
 
     <div class="modal__body">
+      <div class="callout callout--warn" *ngIf="pendingSend()">
+        You started {{ pendingSend() === 'one' ? 'Email card' : 'Email batch' }}. Enter email + password for the active account, then click Send.
+      </div>
+
       <div class="field">
         <label class="label">Active email account</label>
         <div class="row">
@@ -367,6 +371,14 @@
     <div class="modal__footer">
       <button class="btn btn--secondary" (click)="loadEmailSettings()" [disabled]="isSavingSettings()">Reload</button>
       <button class="btn" (click)="saveEmailSettings()" [disabled]="isSavingSettings()">Save</button>
+      <button
+        class="btn"
+        *ngIf="pendingSend()"
+        (click)="sendPendingFromModal()"
+        [disabled]="isSavingSettings() || isEmailing() || !canSendWithActiveSettings()"
+      >
+        Send
+      </button>
       <span class="status" *ngIf="settingsStatus()">{{ settingsStatus() }}</span>
     </div>
   </div>

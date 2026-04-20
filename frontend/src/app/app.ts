@@ -95,6 +95,7 @@ export class App {
   protected readonly lastGenerated = signal<GenerateOut | null>(null);
 
   protected readonly settingsOpen = signal(false);
+  protected readonly pendingSend = signal<'one' | 'batch' | null>(null);
   protected readonly emailActive = signal<EmailProvider>('microsoft');
   protected readonly emailDefaults = signal<Record<EmailProvider, EmailProviderDefaults> | null>(null);
 
@@ -164,6 +165,7 @@ export class App {
   }
 
   protected closeSettings(): void {
+    this.pendingSend.set(null);
     this.settingsOpen.set(false);
   }
 
@@ -564,10 +566,6 @@ export class App {
       const resp = await firstValueFrom(this.http.put<EmailSettingsV2>(`${this.apiBase}/settings/email`, payload));
       if (resp?.defaults) this.emailDefaults.set(resp.defaults);
       this.settingsStatus.set('Saved.');
-
-      // If the user didn't opt in to save the password, clear it locally too.
-      if (!this.msSavePassword()) this.msPassword.set('');
-      if (!this.gmailSavePassword()) this.gmailPassword.set('');
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to save settings.';
       this.settingsStatus.set(String(msg));
@@ -577,7 +575,24 @@ export class App {
     }
   }
 
-  protected async sendEmailBatch(): Promise<void> {
+  protected canSendWithActiveSettings(): boolean {
+    const emailAddr = this.currentEmail().trim();
+    const password = this.currentPassword();
+    return !!emailAddr && !!password;
+  }
+
+  protected async sendPendingFromModal(): Promise<void> {
+    const pending = this.pendingSend();
+    if (!pending) return;
+
+    if (pending === 'one') {
+      await this.sendEmailOne({ fromSettingsModal: true });
+    } else {
+      await this.sendEmailBatch({ fromSettingsModal: true });
+    }
+  }
+
+  protected async sendEmailBatch(opts?: { fromSettingsModal?: boolean }): Promise<void> {
     this.error.set(null);
     this.emailStatus.set(null);
     this.emailResult.set(null);
@@ -596,7 +611,10 @@ export class App {
 
     if (!emailAddr || !password) {
       this.error.set('Enter email + password for the active account in Email settings.');
-      this.openSettings();
+      if (!opts?.fromSettingsModal) {
+        this.pendingSend.set('batch');
+        this.openSettings();
+      }
       return;
     }
     if (!d) {
@@ -631,6 +649,7 @@ export class App {
       const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
       this.emailResult.set(resp);
       this.emailStatus.set(`Email complete: ${resp.sent} sent, ${resp.skipped} skipped, ${resp.errors} errors.`);
+      this.pendingSend.set(null);
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to send email.';
       this.error.set(String(msg));
@@ -641,7 +660,7 @@ export class App {
     }
   }
 
-  protected async sendEmailOne(): Promise<void> {
+  protected async sendEmailOne(opts?: { fromSettingsModal?: boolean }): Promise<void> {
     this.error.set(null);
     this.emailStatus.set(null);
     this.emailResult.set(null);
@@ -665,7 +684,10 @@ export class App {
 
     if (!emailAddr || !password) {
       this.error.set('Enter email + password for the active account in Email settings.');
-      this.openSettings();
+      if (!opts?.fromSettingsModal) {
+        this.pendingSend.set('one');
+        this.openSettings();
+      }
       return;
     }
     if (!d) {
@@ -707,6 +729,7 @@ export class App {
       const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
       this.emailResult.set(resp);
       this.emailStatus.set(`Email complete: ${resp.sent} sent, ${resp.skipped} skipped, ${resp.errors} errors.`);
+      this.pendingSend.set(null);
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to send email.';
       this.error.set(String(msg));
