@@ -83,6 +83,13 @@
         <button class="btn" (click)="generateOne()" [disabled]="isLoading() || !templateBase64() || !idNumber().trim()">
           Generate card
         </button>
+        <button
+          class="btn btn--secondary"
+          (click)="sendEmailOne()"
+          [disabled]="isLoading() || isEmailing() || !idNumber().trim() || !email().trim()"
+        >
+          Email card
+        </button>
         <button class="btn btn--secondary" (click)="saveMember()" [disabled]="isLoading()">Save member</button>
         <button class="btn btn--ghost" (click)="newMember()" [disabled]="isLoading()">New</button>
         <span class="status" *ngIf="isLoading()">Rendering…</span>
@@ -111,7 +118,6 @@
         <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || members().length === 0">
           Email batch
         </button>
-        <button class="btn btn--secondary" (click)="openSettings()" [disabled]="isLoading()">Email settings</button>
         <span class="status" *ngIf="emailStatus()">{{ emailStatus() }}</span>
       </div>
 

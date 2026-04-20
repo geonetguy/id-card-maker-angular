@@ -526,6 +526,82 @@ export class App {
     }
   }
 
+  protected async sendEmailOne(): Promise<void> {
+    this.error.set(null);
+    this.emailStatus.set(null);
+    this.emailResult.set(null);
+
+    const idnum = this.idNumber().trim();
+    const toEmail = this.email().trim();
+    if (!idnum) {
+      this.error.set('ID Number is required.');
+      return;
+    }
+    if (!toEmail) {
+      this.error.set('Member email is required.');
+      return;
+    }
+
+    const emailAddr = this.currentEmail().trim();
+    const password = this.currentPassword();
+    const defaults = this.emailDefaults();
+    const provider = this.emailActive();
+    const d = defaults?.[provider];
+
+    if (!emailAddr || !password) {
+      this.error.set('Enter email + password for the active account in Email settings.');
+      this.openSettings();
+      return;
+    }
+    if (!d) {
+      this.error.set('Email defaults not loaded yet. Try again.');
+      return;
+    }
+
+    this.isEmailing.set(true);
+    this.isLoading.set(true);
+    this.emailStatus.set('Sending email...');
+
+    try {
+      const payload = {
+        members: [
+          {
+            name: this.name().trim(),
+            id_number: idnum,
+            date: this.date().trim(),
+            email: toEmail,
+          },
+        ],
+        smtp: {
+          host: d.smtp_server,
+          port: d.smtp_port,
+          use_tls: (d.smtp_encryption ?? '').toUpperCase().startsWith('STARTTLS'),
+          use_ssl: (d.smtp_encryption ?? '').toUpperCase().startsWith('SSL'),
+          username: emailAddr,
+          password,
+          from_name: this.currentFromName(),
+          from_email: emailAddr,
+        },
+        subject_tpl: this.currentSubjectTpl(),
+        body_tpl: this.currentBodyTpl(),
+        template_base64: this.templateBase64(),
+        signature_base64: this.signatureBase64(),
+        output_dir: this.outputDir().trim() || null,
+      };
+
+      const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
+      this.emailResult.set(resp);
+      this.emailStatus.set(`Email complete: ${resp.sent} sent, ${resp.skipped} skipped, ${resp.errors} errors.`);
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to send email.';
+      this.error.set(String(msg));
+      this.emailStatus.set(String(msg));
+    } finally {
+      this.isEmailing.set(false);
+      this.isLoading.set(false);
+    }
+  }
+
   protected async refreshPreview(): Promise<void> {
     this.error.set(null);
     this.warning.set(null);
