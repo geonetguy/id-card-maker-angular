@@ -186,6 +186,12 @@
         <h2>Members ({{ members().length }})</h2>
 
         <div class="actions">
+          <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">
+            Add member row
+          </button>
+        </div>
+
+        <div class="actions">
           <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || members().length === 0">
             Email batch
           </button>
@@ -231,18 +237,43 @@
                     [class.tableRow--selected]="selectedIndex() === $index"
                     (click)="selectRow($index)"
                   >
-                    <td>{{ m.name }}</td>
-                    <td>{{ m.id_number }}</td>
-                    <td>{{ m.date }}</td>
-                    <td>{{ m.email }}</td>
+                    <td>
+                      <input
+                        class="tableCellInput"
+                        [value]="m.name"
+                        (input)="updateRowField($index, 'name', $any($event.target).value)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="tableCellInput"
+                        [value]="m.id_number"
+                        (input)="updateRowField($index, 'id_number', $any($event.target).value)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="tableCellInput"
+                        placeholder="YYYY-MM-DD"
+                        [value]="m.date"
+                        (input)="updateRowField($index, 'date', $any($event.target).value)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="tableCellInput"
+                        [value]="m.email"
+                        (input)="updateRowField($index, 'email', $any($event.target).value)"
+                      />
+                    </td>
                   </tr>
                 }
               } @else {
                 <tr class="tableRow tableRow--placeholder">
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
-                  <td>&nbsp;</td>
+                  <td><input class="tableCellInput" disabled value="" /></td>
+                  <td><input class="tableCellInput" disabled value="" /></td>
+                  <td><input class="tableCellInput" disabled value="" /></td>
+                  <td><input class="tableCellInput" disabled value="" /></td>
                 </tr>
               }
             </tbody>

@@ -369,9 +369,34 @@
 .table th,
 .table td {
   text-align: left;
-  padding: 10px 10px;
+  padding: 0;
   border-bottom: 1px solid var(--uip-border);
   white-space: nowrap;
+}
+
+.table th {
+  padding: 10px 10px;
+}
+
+.tableCellInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--uip-radius-md);
+  background: transparent;
+  color: var(--uip-text);
+  outline: none;
+}
+
+.tableCellInput:focus {
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+  background: #fffdfb;
+}
+
+.tableCellInput:disabled {
+  opacity: 0.5;
 }
 
 .table th {

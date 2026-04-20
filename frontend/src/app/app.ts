@@ -194,6 +194,20 @@ export class App {
     if (kind === 'id') this.idNumber.set(v);
     if (kind === 'date') this.date.set(v);
     if (kind === 'email') this.email.set(v);
+
+    // If a table row is selected, edits in the form update that row live.
+    const idx = this.selectedIndex();
+    if (idx !== null) {
+      const field: keyof Member =
+        kind === 'name' ? 'name' : kind === 'id' ? 'id_number' : kind === 'date' ? 'date' : 'email';
+      const rows = this.members();
+      if (idx >= 0 && idx < rows.length) {
+        const nextRows = rows.slice();
+        const row = { ...nextRows[idx], [field]: v };
+        nextRows[idx] = row;
+        this.members.set(nextRows);
+      }
+    }
     this.schedulePreview();
   }
 
@@ -348,6 +362,33 @@ export class App {
     this.date.set(row.date || '');
     this.email.set(row.email || '');
     this.schedulePreview();
+  }
+
+  protected addMemberRow(): void {
+    const rows = this.members();
+    const next: Member = { name: '', id_number: '', date: '', email: '' };
+    const updated = [...rows, next];
+    this.members.set(updated);
+    this.selectRow(updated.length - 1);
+  }
+
+  protected updateRowField(index: number, field: keyof Member, value: string): void {
+    const rows = this.members();
+    if (index < 0 || index >= rows.length) return;
+
+    const nextRows = rows.slice();
+    const row = { ...nextRows[index] };
+    row[field] = value ?? '';
+    nextRows[index] = row;
+    this.members.set(nextRows);
+
+    if (this.selectedIndex() === index) {
+      this.name.set(row.name || '');
+      this.idNumber.set(row.id_number || '');
+      this.date.set(row.date || '');
+      this.email.set(row.email || '');
+      this.schedulePreview();
+    }
   }
 
   protected newMember(): void {
