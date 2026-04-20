@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgIf } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -118,6 +118,16 @@ export class App {
   protected readonly isEmailing = signal(false);
   protected readonly settingsStatus = signal<string | null>(null);
   protected readonly isSavingSettings = signal(false);
+
+  protected readonly hasTemplate = computed(() => !!this.templateBase64());
+  protected readonly hasSignature = computed(() => !!this.signatureBase64());
+  protected readonly assetsReady = computed(() => this.hasTemplate() && this.hasSignature());
+
+  protected readonly hasActiveEmailCreds = computed(() => {
+    const emailAddr = this.currentEmail().trim();
+    const password = this.currentPassword();
+    return !!emailAddr && !!password;
+  });
 
   private previewDebounceTimer: number | null = null;
 

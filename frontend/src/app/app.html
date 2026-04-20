@@ -131,14 +131,14 @@
       </div>
 
       <div class="actions">
-        <button class="btn" (click)="refreshPreview()" [disabled]="isLoading() || !templateBase64()">Refresh preview</button>
-        <button class="btn" (click)="generateOne()" [disabled]="isLoading() || !templateBase64() || !idNumber().trim()">
+        <!-- Preview refresh is automatic on changes -->
+        <button class="btn" (click)="generateOne()" [disabled]="isLoading() || !assetsReady() || !idNumber().trim()">
           Generate card
         </button>
         <button
           class="btn btn--secondary"
           (click)="sendEmailOne()"
-          [disabled]="isLoading() || isEmailing() || !idNumber().trim() || !email().trim()"
+          [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasActiveEmailCreds() || !idNumber().trim() || !email().trim()"
         >
           Email card
         </button>
@@ -147,9 +147,9 @@
       </div>
 
       <div class="actions" *ngIf="generateStatus() || lastGenerated()">
-        <button class="btn btn--secondary" (click)="downloadLast()" [disabled]="!lastGenerated()">Download PNG</button>
-        <button class="btn btn--secondary" (click)="openGenerated('file')" [disabled]="!lastGenerated()">Open file</button>
-        <button class="btn btn--secondary" (click)="openGenerated('folder')" [disabled]="!lastGenerated()">Open folder</button>
+        <button class="btn btn--secondary" (click)="downloadLast()" [disabled]="isLoading() || !lastGenerated()">Download PNG</button>
+        <button class="btn btn--secondary" (click)="openGenerated('file')" [disabled]="isLoading() || !lastGenerated()">Open file</button>
+        <button class="btn btn--secondary" (click)="openGenerated('folder')" [disabled]="isLoading() || !lastGenerated()">Open folder</button>
         <span class="status" *ngIf="generateStatus()">{{ generateStatus() }}</span>
       </div>
 
@@ -186,10 +186,10 @@
         <h2>Members ({{ members().length }})</h2>
 
         <div class="actions">
-          <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || members().length === 0">
+          <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasActiveEmailCreds() || members().length === 0">
             Email batch
           </button>
-          <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !templateBase64() || members().length === 0">
+          <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || members().length === 0">
             Generate batch
           </button>
         </div>
