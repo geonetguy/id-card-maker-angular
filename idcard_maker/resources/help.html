@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ID Card Maker — Help</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 14px/1.55 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin: 1.25rem; }
+    h1,h2,h3 { margin: .6rem 0; }
+    h1 { margin-bottom: .2rem; }
+    h2 { margin-top: 1.1rem; }
+    code,kbd { background: #f5f5f7; padding: .15rem .35rem; border-radius: 4px; }
+    .tip { background: #eef9ff; border: 1px solid #cde8f7; padding: .6rem .8rem; border-radius: 6px; }
+    .warn { background: #fff7e6; border: 1px solid #fde1aa; padding: .6rem .8rem; border-radius: 6px; }
+    ul { margin-top: .4rem; }
+    li + li { margin-top: .25rem; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: .4rem .55rem; }
+    th { background: #f4f6f8; text-align: left; }
+    small { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>ID Card Maker</h1>
+  <p class="tip">Press <kbd>F1</kbd> or choose <em>Help → Help</em> to open this page.</p>
+
+  <h2>Overview</h2>
+  <p>
+    ID Card Maker lets you preview, generate, and email membership ID cards
+    from manual entries or a comma separated values file (CSV).
+  </p>
+
+  <h2>Before You Start</h2>
+  <ul>
+    <li><strong>Choose a Template</strong> (<em>Choose Template…</em>) and a <strong>Signature</strong> (<em>Choose Signature…</em>) first.
+      Editing controls, CSV import, and table selection remain disabled until both are selected.</li>
+    <li>A default template appears in the preview at launch. You can change it anytime.</li>
+  </ul>
+
+  <h2>Quick Start</h2>
+  <ol>
+    <li><strong>Choose Template…</strong> — pick your card image if you don't want to use the default (e.g. <code>template.png</code>).</li>
+    <li><strong>Choose Signature…</strong> — select a signature image to overlay on each card.</li>
+    <li><strong>Enter Member</strong> — full <em>Name</em>, <em>ID Number (<code>XXXXYYY</code>)</em>, <em>Date</em> (<code>YYYY-MM-DD</code>), and <em>Email</em>.
+      The preview refreshes with every change.</li>
+    <li><strong>Add member</strong> — adds the member to the bottom of the table. Click a row to edit it (button changes to <em>Update member</em>).</li>
+    <li><strong>Generate All Cards</strong> — saves the id card images for all rows to the output folder, which then opens.</li>
+    <li><strong>Email Selected</strong> — emails the card for the currently selected row.</li>
+    <li><strong>Email All</strong> — emails all the cards for all rows that have generated images.</li>
+  </ol>
+
+  <h2>Manual Entry &amp; Editing</h2>
+  <ul>
+    <li><strong>Live preview:</strong> As you type in any field (Name, ID, Date, Email), the card preview updates.</li>
+	<li><strong>ID Number:</strong> Enter as <code>XXXXYYY</code>. The ID Number is assigned by Sentinelle when you add them. The ID Number is the current year (2025) and the next avialable number in sequece (001 to 999)</li>
+    <li><strong>Date:</strong> Enter as <code>YYYY-MM-DD</code>. Other common formats are auto-normalized when possible.
+      Be sure to check Sentinelle for the correct ID Number before emailing the ID Card.</li>
+    <li><strong>Add vs Update:</strong>
+      <ul>
+        <li>Click <em>New Member</em> to clear fields and return to <em>Add</em> mode.</li>
+        <li>Select a table row to switch to <em>Update</em> mode; fields and preview populate, and clicking <em>Update member</em> writes changes to that row.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h2>Comma Separated values FIle (CSV) Import</h2>
+  <p><strong>Load CSV…</strong> becomes available after selecting a Template and Signature.</p>
+  <p>The CSV must include a header row with these columns:</p>
+  <table>
+    <thead><tr><th>Name</th><th>ID Number</th><th>Date</th><th>Email</th></tr></thead>
+    <tbody><tr><td>Jane Smith</td><td>2025099</td><td>2025-06-30</td><td>jane@example.com</td></tr></tbody>
+  </table>
+  <ul>
+    <li><strong>Date handling:</strong> Several common formats are accepted and normalized to <code>YYYY-MM-DD</code>. Unrecognized dates are left blank.</li>
+    <li>After import, clicking any row populates the manual fields and updates the preview.</li>
+  </ul>
+
+  <h2>Save Table</h2>
+  <ul>
+    <li>Click <strong>Save Table</strong> to export the current rows to CSV with headers in this order: <code>Name, ID Number, Date, Email</code>. This can be useful for adding members to sentinelle later using copy and paste.</li>
+  </ul>
+
+  <h2>Generating Cards</h2>
+  <ul>
+    <li><strong>Generate All Cards</strong> renders cards for every row using the currently selected Template and Signature.</li>
+    <li>Cards are saved to the output folder, which opens when generation completes.</li>
+  </ul>
+
+  <h2>Emailing Cards (Office 365)</h2>
+  <ul>
+    <li>Uses Office 365 email and password. On first use, sign in with <em>Username</em>, <em>From email</em>, optional <em>From name</em>, and <em>Password/App Password</em>. These credentials are saved until the program is restarted so that subsequent emailing dosn't require you  to log in agian.</li>
+    <li><strong>Quick sender buttons:</strong> President, Vice President, and Membership Officer can be used to autofill sender details.</li>
+    <li><strong>Email Selected:</strong> Sends the card for the currently selected row. If the card image hasn’t been generated yet, it will be created automatically and attached.</li>
+    <li><strong>Email All:</strong> Sends cards for all rows that already have generated images. If you haven’t generated cards, use <em>Generate All Cards</em> first; rows without images are skipped.</li>
+  </ul>
+
+  <h2>Template &amp; Signature</h2>
+  <ul>
+    <li><strong>Choose Template…</strong> selects the background image used for all cards.</li>
+    <li><strong>Choose Signature…</strong> overlays a signature image on each card.</li>
+    <li>Both must be selected before editing entries or importing CSV.</li>
+  </ul>
+
+  <h2>Clear Cards</h2>
+  <ul>
+    <li><strong>Clear cards</strong> requires a second click within 6 seconds to confirm.</li>
+    <li>It empties the output folder, clears the table and inputs, returns to <em>Add</em> mode, and refreshes the preview. Your template/signature selections remain.</li>
+  </ul>
+
+  <h2>Keyboard &amp; Tips</h2>
+  <ul>
+    <li><kbd>F1</kbd> — Open this Help page.</li>
+    <li><strong>Best date format:</strong> <code>YYYY-MM-DD</code>.</li>
+    <li><strong>Status bar:</strong> Watch the status bar for confirmations, progress, and any errors.</li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <ul>
+    <li><strong>Editing controls are disabled:</strong> Choose both a Template and a Signature.</li>
+    <li><strong>Preview is blank:</strong> Choose a Template.</li>
+    <li><strong>Email All skipped some rows:</strong> Generate cards first (or use <em>Email Selected</em> to send an individual card, which will generate the image if needed).</li>
+    <li><strong>Date didn’t print:</strong> Enter it as <code>YYYY-MM-DD</code>.</li>
+  </ul>
+
+  <h2>Privacy &amp; Storage</h2>
+  <ul>
+    <li>SMTP credentials are used to send email and are not written to disk by the app.</li>
+    <li>Generated cards and exported CSVs are saved in your local output folder.</li>
+  </ul>
+
+  <p><small>For assistance, contact your administrator.</small></p>
+</body>
+</html>

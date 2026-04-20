@@ -1,0 +1,38 @@
+[tool.briefcase]
+project_name = "ID Card Maker"
+bundle = "ca.cupe3523"
+version = "1.0.0"
+url = "https://example.org/idcard-maker"
+license = "MIT"
+author = "Georg York"
+author_email = "h2onetguy@hotmail.com"
+
+[tool.briefcase.app.idcard_maker]
+formal_name = "ID Card Maker"
+app_name = "idcard_maker"
+description = "Generate, preview, and email ID cards from manual entries or CSV."
+sources = ["idcard_maker"]
+
+# Use modern, stable ranges (keeps you current without surprise major breaks)
+requires = [
+    "toga>=0.5,<0.6",
+    "pillow>=10.0.0",
+    "python-barcode>=0.15.0"
+]
+
+# Bundle all runtime assets (template.png, stripe.png, courbd.ttf, logo.png, help.html, etc.)
+resources = [
+    "idcard_maker/resources/*"
+]
+
+# Optional: point to a base icon name; Briefcase will pick platform variants if present.
+icon = "idcard_maker/resources/logo"
+
+[tool.briefcase.app.idcard_maker.windows]
+# (Keep empty unless you have Windows-only requirements)
+
+[tool.briefcase.app.idcard_maker.macOS]
+# (Keep empty unless you have macOS-only requirements)
+
+[tool.briefcase.app.idcard_maker.linux]
+# (Keep empty unless you have Linux-only requirements)

@@ -1,0 +1,267 @@
+Date/Time:       2025-08-21 19:15:15 
+Command line:    E:\beeware id card\idcard_maker\.venv\Scripts\briefcase dev
+
+OS Release:      Windows 10
+OS Version:      10.0.26100
+Architecture:    AMD64
+Platform:        Windows-10-10.0.26100-SP0
+
+Python exe:      E:\beeware id card\idcard_maker\.venv\Scripts\python.exe
+Python version:  3.11.13 (main, Jun 12 2025, 12:41:34) [MSC v.1943 64 bit (AMD64)]
+Virtual env:     True
+Conda env:       False
+
+Briefcase:       0.3.24
+Target platform: windows
+Target format:   None
+
+Environment Variables:
+	ALLUSERSPROFILE=C:\ProgramData
+	APPDATA=C:\Users\GEOTECHGUY\AppData\Roaming
+	BUNDLED_DEBUGPY_PATH=c:\Users\GEOTECHGUY\.vscode\extensions\ms-python.debugpy-2025.10.0-win32-x64\bundled\libs\debugpy
+	CHOCOLATEYINSTALL=C:\ProgramData\chocolatey
+	CHOCOLATEYLASTPATHUPDATE=133866375859082956
+	CHROME_CRASHPAD_PIPE_NAME=\\.\pipe\crashpad_11352_GZVLYPCWXZCTRHTS
+	COLORTERM=truecolor
+	COMMONPROGRAMFILES=C:\Program Files\Common Files
+	COMMONPROGRAMFILES(X86)=C:\Program Files (x86)\Common Files
+	COMMONPROGRAMW6432=C:\Program Files\Common Files
+	COMPUTERNAME=GEOTEC
+	COMSPEC=C:\WINDOWS\system32\cmd.exe
+	CONFIGSETROOT=C:\WINDOWS\ConfigSetRoot
+	CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6
+	CUDA_PATH_V12_6=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6
+	DRIVERDATA=C:\Windows\System32\Drivers\DriverData
+	EFC_19532_1592913036=1
+	GIT_ASKPASS=********************
+	HOMEDRIVE=C:
+	HOMEPATH=\Users\GEOTECHGUY
+	LANG=en_US.UTF-8
+	LOCALAPPDATA=C:\Users\GEOTECHGUY\AppData\Local
+	LOGONSERVER=\\GEOTEC
+	NUMBER_OF_PROCESSORS=28
+	NVM_HOME=C:\Users\GEOTECHGUY\AppData\Local\nvm
+	NVM_SYMLINK=C:\nvm4w\nodejs
+	ONEDRIVE=C:\Users\GEOTECHGUY\OneDrive
+	ORIGINAL_XDG_CURRENT_DESKTOP=undefined
+	OS=Windows_NT
+	PATH=E:\beeware id card\idcard_maker\.venv\Scripts;C:\Program Files\Python311\Scripts\;C:\Program Files\Python311\;C:\Python313\Scripts\;C:\Python313\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\libnvvp;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.3.2\;C:\ProgramData\chocolatey\bin;C:\Program Files\Docker\Docker\resources\bin;C:\Users\GEOTECHGUY\AppData\Roaming\Python\Python313\Scripts;C:\Program Files\Git\cmd;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\GEOTECHGUY\AppData\Local\nvm;C:\nvm4w\nodejs;C:\Program Files\nodejs\;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\160\Tools\Binn\;C:\Program Files\Microsoft SQL Server\160\Tools\Binn\;C:\Program Files\Microsoft SQL Server\160\DTS\Binn\;C:\Program Files\Tesseract-OCR\;C:\Program Files\dotnet\;C:\Users\GEOTECHGUY\.cargo\bin;C:\python312\Scripts\;C:\python312\;C:\Users\GEOTECHGUY\.local\bin;C:\Users\GEOTECHGUY\AppData\Local\Microsoft\WindowsApps;C:\Users\GEOTECHGUY\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\GEOTECHGUY\.cache\lm-studio\bin;C:\Users\GEOTECHGUY\AppData\Local\Microsoft\WindowsApps;C:\Users\GEOTECHGUY\AppData\Local\Programs\Ollama;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64;C:\Users\GEOTECHGUY\AppData\Local\GitHubDesktop\bin;C:\Users\GEOTECHGUY\AppData\Local\nvm;C:\nvm4w\nodejs;C:\Users\GEOTECHGUY\AppData\Roaming\npm;C:\Users\GEOTECHGUY\.dotnet\tools;c:\Users\GEOTECHGUY\.vscode\extensions\ms-python.debugpy-2025.10.0-win32-x64\bundled\scripts\noConfigScripts;c:\Users\GEOTECHGUY\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\debugCommand
+	PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.PY;.PYW
+	PROCESSOR_ARCHITECTURE=AMD64
+	PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+	PROCESSOR_LEVEL=6
+	PROCESSOR_REVISION=b701
+	PROGRAMDATA=C:\ProgramData
+	PROGRAMFILES=C:\Program Files
+	PROGRAMFILES(X86)=C:\Program Files (x86)
+	PROGRAMW6432=C:\Program Files
+	PROMPT=(idcard_maker) $P$G
+	PSMODULEPATH=C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules;C:\Program Files (x86)\Microsoft SQL Server\160\Tools\PowerShell\Modules\
+	PUBLIC=C:\Users\Public
+	PYDEVD_DISABLE_FILE_VALIDATION=1
+	SESSIONNAME=Console
+	SYSTEMDRIVE=C:
+	SYSTEMROOT=C:\WINDOWS
+	TEMP=C:\Users\GEOTEC~1\AppData\Local\Temp
+	TERM_PROGRAM=vscode
+	TERM_PROGRAM_VERSION=1.103.1
+	TESSDATA_PREFIX=C:\Program Files\Tesseract-OCR\tessdata
+	TMP=C:\Users\GEOTEC~1\AppData\Local\Temp
+	USERDOMAIN=GEOTEC
+	USERDOMAIN_ROAMINGPROFILE=GEOTEC
+	USERNAME=GEOTECHGUY
+	USERPROFILE=C:\Users\GEOTECHGUY
+	VIRTUAL_ENV=E:\beeware id card\idcard_maker\.venv
+	VIRTUAL_ENV_PROMPT=idcard_maker
+	VSCODE_DEBUGPY_ADAPTER_ENDPOINTS=c:\Users\GEOTECHGUY\.vscode\extensions\ms-python.debugpy-2025.10.0-win32-x64\.noConfigDebugAdapterEndpoints\endpoint-6d9b7384e23dfbce.txt
+	VSCODE_GIT_ASKPASS_EXTRA_ARGS=********************
+	VSCODE_GIT_ASKPASS_MAIN=********************
+	VSCODE_GIT_ASKPASS_NODE=********************
+	VSCODE_GIT_IPC_HANDLE=\\.\pipe\vscode-git-4cd01bb3ff-sock
+	WINDIR=C:\WINDOWS
+	_OLD_VIRTUAL_PATH=C:\Program Files\Python311\Scripts\;C:\Program Files\Python311\;C:\Python313\Scripts\;C:\Python313\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\libnvvp;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.3.2\;C:\ProgramData\chocolatey\bin;C:\Program Files\Docker\Docker\resources\bin;C:\Users\GEOTECHGUY\AppData\Roaming\Python\Python313\Scripts;C:\Program Files\Git\cmd;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\GEOTECHGUY\AppData\Local\nvm;C:\nvm4w\nodejs;C:\Program Files\nodejs\;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\;C:\Program Files (x86)\Microsoft SQL Server\160\Tools\Binn\;C:\Program Files\Microsoft SQL Server\160\Tools\Binn\;C:\Program Files\Microsoft SQL Server\160\DTS\Binn\;C:\Program Files\Tesseract-OCR\;C:\Program Files\dotnet\;C:\Users\GEOTECHGUY\.cargo\bin;C:\python312\Scripts\;C:\python312\;C:\Users\GEOTECHGUY\.local\bin;C:\Users\GEOTECHGUY\AppData\Local\Microsoft\WindowsApps;C:\Users\GEOTECHGUY\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\GEOTECHGUY\.cache\lm-studio\bin;C:\Users\GEOTECHGUY\AppData\Local\Microsoft\WindowsApps;C:\Users\GEOTECHGUY\AppData\Local\Programs\Ollama;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64;C:\Users\GEOTECHGUY\AppData\Local\GitHubDesktop\bin;C:\Users\GEOTECHGUY\AppData\Local\nvm;C:\nvm4w\nodejs;C:\Users\GEOTECHGUY\AppData\Roaming\npm;C:\Users\GEOTECHGUY\.dotnet\tools;c:\Users\GEOTECHGUY\.vscode\extensions\ms-python.debugpy-2025.10.0-win32-x64\bundled\scripts\noConfigScripts;c:\Users\GEOTECHGUY\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\debugCommand
+	_OLD_VIRTUAL_PROMPT=$P$G
+
+pyproject.toml:
+[tool.briefcase]
+project_name = "ID Card Maker"
+bundle = "com.example"              # ← change to your org (reverse DNS)
+version = "0.1.0"
+url = "https://example.com"
+license = "MIT"
+author = "Georg York"
+author_email = "h2onetguy@hotmail.com"
+
+[tool.briefcase.app.idcard_maker]
+formal_name = "ID Card Maker"
+app_name = "idcard_maker"
+description = "Generate and email ID cards from single entries or CSV."
+sources = ["idcard_maker"]
+requires = [
+    "toga>=0.4",
+    "pillow",
+    "python-barcode[images]"
+]
+# If you add a logo: place logo.png/.ico in idcard_maker/resources and uncomment:
+icon = "idcard_maker/resources/logo"
+
+resources = [
+    "idcard_maker/resources/*"
+]
+
+[tool.briefcase.app.idcard_maker.windows]
+# Add Windows-only Python deps if needed
+
+[tool.briefcase.app.idcard_maker.macOS]
+# Add macOS-only deps if needed
+
+[tool.briefcase.app.idcard_maker.linux]
+# Add Linux-only deps if needed
+
+Briefcase Log:
+[19:15:15]                                                                                                                                                             config.py:666
+           *************************************************************************                                                                                   config.py:666
+           ** WARNING: License Definition for the Project is Deprecated           **                                                                                   config.py:666
+           *************************************************************************                                                                                   config.py:666
+                                                                                                                                                                       config.py:666
+               Briefcase now uses PEP 621 format for license definitions.                                                                                              config.py:666
+                                                                                                                                                                       config.py:666
+               Previously, the name of the license was assigned to the 'license'                                                                                       config.py:666
+               field in pyproject.toml. For PEP 621, the name of the license is                                                                                        config.py:666
+               assigned to 'license.text' or the name of the file containing the                                                                                       config.py:666
+               license is assigned to 'license.file'.                                                                                                                  config.py:666
+                                                                                                                                                                       config.py:666
+               The current configuration for the Project has a 'license' field                                                                                         config.py:666
+               that is specified as a string:                                                                                                                          config.py:666
+                                                                                                                                                                       config.py:666
+                   license = "MIT"                                                                                                                                     config.py:666
+                                                                                                                                                                       config.py:666
+               To use the PEP 621 format (and to remove this warning), specify that                                                                                    config.py:666
+               the LICENSE file contains the license for the Project:                                                                                                  config.py:666
+                                                                                                                                                                       config.py:666
+                   license.file = "LICENSE"                                                                                                                            config.py:666
+                                                                                                                                                                       config.py:666
+           *************************************************************************                                                                                   config.py:666
+                                                                                                                                                                          dev.py:248
+           [idcard_maker] Starting in dev mode...                                                                                                                         dev.py:248
+                                                                                                                                                                   subprocess.py:838
+           >>> Running Command:                                                                                                                                    subprocess.py:838
+           >>>     'E:\beeware id card\idcard_maker\.venv\Scripts\python.exe' -c 'import runpy,                                                                    subprocess.py:838
+           sys;sys.path.pop(0);sys.argv.extend([]);runpy.run_module("idcard_maker", run_name="__main__", alter_sys=True)'                                                           
+           >>> Working Directory:                                                                                                                                  subprocess.py:838
+           >>>     C:\Users\GEOTECHGUY                                                                                                                             subprocess.py:838
+           >>> Environment Overrides:                                                                                                                              subprocess.py:838
+           >>>     PYTHONPATH=E:\beeware id card                                                                                                                   subprocess.py:838
+           >>>     PYTHONMALLOC=default                                                                                                                            subprocess.py:838
+           >>>     PYTHONUNBUFFERED=1                                                                                                                              subprocess.py:838
+           >>>     PYTHONDEVMODE=1                                                                                                                                 subprocess.py:838
+           >>>     PYTHONUTF8=1                                                                                                                                    subprocess.py:838
+           ===========================================================================                                                                                    run.py:169
+           Traceback (most recent call last):                                                                                                                      subprocess.py:195
+             File "<string>", line 1, in <module>                                                                                                                  subprocess.py:195
+             File "<frozen runpy>", line 226, in run_module                                                                                                        subprocess.py:195
+             File "<frozen runpy>", line 98, in _run_module_code                                                                                                   subprocess.py:195
+             File "<frozen runpy>", line 88, in _run_code                                                                                                          subprocess.py:195
+             File "E:\beeware id card\idcard_maker\__main__.py", line 2, in <module>                                                                               subprocess.py:195
+               from .app import main                                                                                                                               subprocess.py:195
+             File "E:\beeware id card\idcard_maker\app.py", line 10, in <module>                                                                                   subprocess.py:195
+               from .controllers.actions import Actions                                                                                                            subprocess.py:195
+             File "E:\beeware id card\idcard_maker\controllers\__init__.py", line 2, in <module>                                                                   subprocess.py:195
+               from .actions import Actions                                                                                                                        subprocess.py:195
+             File "E:\beeware id card\idcard_maker\controllers\actions.py", line 31, in <module>                                                                   subprocess.py:195
+               class Actions:                                                                                                                                      subprocess.py:195
+             File "E:\beeware id card\idcard_maker\controllers\actions.py", line 106, in Actions                                                                   subprocess.py:195
+               self._help_win.show()                                                                                                                               subprocess.py:195
+               ^^^^                                                                                                                                                subprocess.py:195
+           NameError: name 'self' is not defined                                                                                                                   subprocess.py:195
+                                                                                                                                                                      __main__.py:42
+           Problem running app idcard_maker.                                                                                                                          __main__.py:43
+           Saving log... started                                                                                                                                      console.py:433
+
+Main thread traceback:
+╭─────────────────────────────────────────────────────────────────────── Traceback (most recent call last) ────────────────────────────────────────────────────────────────────────╮
+│ E:\beeware id card\idcard_maker\.venv\Lib\site-packages\briefcase\__main__.py:27 in main                                                                                         │
+│                                                                                                                                                                                  │
+│   24 │   │   │   Path.cwd() / "pyproject.toml",                                                                                                                                  │
+│   25 │   │   │   overrides=overrides,                                                                                                                                            │
+│   26 │   │   )                                                                                                                                                                   │
+│ ❱ 27 │   │   command(**options)                                                                                                                                                  │
+│   28 │   except HelpText as e:                                                                                                                                                   │
+│   29 │   │   console.info()                                                                                                                                                      │
+│   30 │   │   console.info(str(e))                                                                                                                                                │
+│                                                                                                                                                                                  │
+│ ╭──────────────────────────────────────────────────────── locals ─────────────────────────────────────────────────────────╮                                                      │
+│ │       command = <briefcase.commands.dev.DevCommand object at 0x0000023947109450>                                        │                                                      │
+│ │       console = <briefcase.console.Console object at 0x0000023943424DD0>                                                │                                                      │
+│ │             e = BriefcaseCommandError('Problem running app idcard_maker.')                                              │                                                      │
+│ │ extra_cmdline = []                                                                                                      │                                                      │
+│ │       options = {'appname': None, 'update_requirements': False, 'run_app': True, 'test_mode': False, 'passthrough': []} │                                                      │
+│ │     overrides = {}                                                                                                      │                                                      │
+│ │        result = 200                                                                                                     │                                                      │
+│ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯                                                      │
+│                                                                                                                                                                                  │
+│ E:\beeware id card\idcard_maker\.venv\Lib\site-packages\briefcase\commands\dev.py:250 in __call__                                                                                │
+│                                                                                                                                                                                  │
+│   247 │   │   │   else:                                                                                                                                                          │
+│   248 │   │   │   │   self.console.info("Starting in dev mode...", prefix=app.app_name)                                                                                          │
+│   249 │   │   │   env = self.get_environment(app)                                                                                                                                │
+│ ❱ 250 │   │   │   return self.run_dev_app(                                                                                                                                       │
+│   251 │   │   │   │   app,                                                                                                                                                       │
+│   252 │   │   │   │   env,                                                                                                                                                       │
+│   253 │   │   │   │   passthrough=[] if passthrough is None else passthrough,                                                                                                    │
+│                                                                                                                                                                                  │
+│ ╭───────────────────────────────────────────────────────────────────────── locals ─────────────────────────────────────────────────────────────────────────╮                     │
+│ │                 app = <com.example.idcard-maker v0.1.0 AppConfig>                                                                                        │                     │
+│ │             appname = None                                                                                                                               │                     │
+│ │      dist_info_path = WindowsPath('E:/beeware id card/idcard_maker.dist-info')                                                                           │                     │
+│ │                 env = {'PYTHONPATH': 'E:\\beeware id card', 'PYTHONMALLOC': 'default', 'PYTHONUNBUFFERED': '1', 'PYTHONDEVMODE': '1', 'PYTHONUTF8': '1'} │                     │
+│ │             options = {}                                                                                                                                 │                     │
+│ │         passthrough = []                                                                                                                                 │                     │
+│ │             run_app = True                                                                                                                               │                     │
+│ │                self = <briefcase.commands.dev.DevCommand object at 0x0000023947109450>                                                                   │                     │
+│ │           test_mode = False                                                                                                                              │                     │
+│ │ update_requirements = False                                                                                                                              │                     │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯                     │
+│                                                                                                                                                                                  │
+│ E:\beeware id card\idcard_maker\.venv\Lib\site-packages\briefcase\commands\dev.py:168 in run_dev_app                                                                             │
+│                                                                                                                                                                                  │
+│   165 │   │   │   )                                                                                                                                                              │
+│   166 │   │   │                                                                                                                                                                  │
+│   167 │   │   │   # Start streaming logs for the app.                                                                                                                            │
+│ ❱ 168 │   │   │   self._stream_app_logs(                                                                                                                                         │
+│   169 │   │   │   │   app,                                                                                                                                                       │
+│   170 │   │   │   │   popen=app_popen,                                                                                                                                           │
+│   171 │   │   │   │   clean_output=False,                                                                                                                                        │
+│                                                                                                                                                                                  │
+│ ╭─────────────────────────────────────────────────────────────────────────────────── locals ───────────────────────────────────────────────────────────────────────────────────╮ │
+│ │         app = <com.example.idcard-maker v0.1.0 AppConfig>                                                                                                                    │ │
+│ │   app_popen = <Popen: returncode: 1 args: ['E:\\beeware id card\\idcard_maker\\.venv\\Scri...>                                                                               │ │
+│ │     cmdline = ['E:\\beeware id card\\idcard_maker\\.venv\\Scripts\\python.exe', '-c', 'import runpy, sys;sys.path.pop(0);sys.argv.extend([]);runpy.run_module("idcard_m'+43] │ │
+│ │         env = {'PYTHONPATH': 'E:\\beeware id card', 'PYTHONMALLOC': 'default', 'PYTHONUNBUFFERED': '1', 'PYTHONDEVMODE': '1', 'PYTHONUTF8': '1'}                             │ │
+│ │ main_module = 'idcard_maker'                                                                                                                                                 │ │
+│ │     options = {}                                                                                                                                                             │ │
+│ │ passthrough = []                                                                                                                                                             │ │
+│ │        self = <briefcase.commands.dev.DevCommand object at 0x0000023947109450>                                                                                               │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                                                                                                  │
+│ E:\beeware id card\idcard_maker\.venv\Lib\site-packages\briefcase\commands\run.py:200 in _stream_app_logs                                                                        │
+│                                                                                                                                                                                  │
+│   197 │   │   │   │   # If we're monitoring an actual app (not just a log stream),                                                                                               │
+│   198 │   │   │   │   # and the app didn't exit cleanly, surface the error to the user.                                                                                          │
+│   199 │   │   │   │   if popen.poll() != 0:                                                                                                                                      │
+│ ❱ 200 │   │   │   │   │   raise BriefcaseCommandError(f"Problem running app {app.app_name}.")                                                                                    │
+│   201 │   │                                                                                                                                                                      │
+│   202 │   │   except KeyboardInterrupt:                                                                                                                                          │
+│   203 │   │   │   pass  # Catch CTRL-C to exit normally                                                                                                                          │
+│                                                                                                                                                                                  │
+│ ╭──────────────────────────────────────────── locals ─────────────────────────────────────────────╮                                                                              │
+│ │          app = <com.example.idcard-maker v0.1.0 AppConfig>                                      │                                                                              │
+│ │ clean_filter = None                                                                             │                                                                              │
+│ │ clean_output = False                                                                            │                                                                              │
+│ │   log_filter = <briefcase.commands.run.LogFilter object at 0x0000023947186C90>                  │                                                                              │
+│ │   log_stream = False                                                                            │                                                                              │
+│ │        popen = <Popen: returncode: 1 args: ['E:\\beeware id card\\idcard_maker\\.venv\\Scri...> │                                                                              │
+│ │         self = <briefcase.commands.dev.DevCommand object at 0x0000023947109450>                 │                                                                              │
+│ ╰─────────────────────────────────────────────────────────────────────────────────────────────────╯                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+BriefcaseCommandError: Problem running app idcard_maker.
