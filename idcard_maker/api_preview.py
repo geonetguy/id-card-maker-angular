@@ -16,6 +16,7 @@ import datetime as _dt
 import io
 import json
 import os
+from pathlib import Path
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
@@ -149,13 +150,17 @@ def generate_preview_response(req: PreviewRequest) -> dict[str, Any]:
     if (req.date or "").strip() and not date_norm:
         warning = "unrecognized_date_format_left_blank"
 
+    font_path: Optional[Path] = Path(__file__).resolve().parent / "resources" / "courbd.ttf"
+    if not font_path.exists():
+        font_path = None
+
     canvas = generate_single_card(
         name=req.name,
         id_number=req.id_number,
         date=(date_norm or ""),
         template=template,
         signature=signature,
-        font_path=None,
+        font_path=font_path,
     )
 
     png_bytes = _png_bytes_from_pil(canvas)

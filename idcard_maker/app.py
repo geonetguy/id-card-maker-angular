@@ -1,36 +1,229 @@
 # idcard_maker/app.py
 from __future__ import annotations
 
-from types import SimpleNamespace
+import os
+import socket
+import threading
+import time
+import tempfile
+import webbrowser
 from pathlib import Path
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from functools import partial
 
 import toga
 
-from .core.resources import resource_path
+from .api_app import app as api_app
 from .constants import APP_TITLE
-from .controllers.actions import Actions
-from .ui.layout import build_ui
+from .core.resources import resource_path
 
 
 class IDCardApp(toga.App):
-    ui: SimpleNamespace  # for Pylance
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._static_httpd: ThreadingHTTPServer | None = None
+        self._static_thread: threading.Thread | None = None
+        self._static_port: int | None = None
+
+    def _is_port_open(self, host: str, port: int, timeout_s: float = 0.15) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=timeout_s):
+                return True
+        except Exception:
+            return False
+
+    def _find_running_dev_server_url(self) -> str | None:
+        """
+        Try to detect an Angular dev server URL.
+
+        `npm start` (ng serve) typically binds to port 4200, but will prompt to
+        use the next port if 4200 is already in use. It may also bind IPv6 only
+        (`::1`) on some systems. We probe a small port range on common hosts.
+        """
+        hosts = ["127.0.0.1", "localhost", "::1"]
+        for port in range(4200, 4211):
+            for host in hosts:
+                if self._is_port_open(host, port):
+                    if host == "127.0.0.1":
+                        return f"http://127.0.0.1:{port}/"
+                    if host == "localhost":
+                        return f"http://localhost:{port}/"
+                    # IPv6-only bind (common when localhost resolves to ::1)
+                    return f"http://[::1]:{port}/"
+        return None
+
+    def _find_built_dist_index(self) -> Path | None:
+        """
+        Find the built Angular `index.html` regardless of current working dir.
+
+        In Briefcase dev/run, the CWD may be inside `.briefcase/...`, so we
+        search upward from this file and from CWD for a `frontend/dist/...` tree.
+        """
+        candidates: list[Path] = []
+        try:
+            candidates.append(Path.cwd())
+        except Exception:
+            pass
+        try:
+            candidates.append(Path(__file__).resolve())
+        except Exception:
+            pass
+
+        seen: set[Path] = set()
+        for base in candidates:
+            for parent in [base, *base.parents]:
+                if parent in seen:
+                    continue
+                seen.add(parent)
+                dist_index = (
+                    parent / "frontend" / "dist" / "frontend" / "browser" / "index.html"
+                )
+                if dist_index.exists():
+                    return dist_index
+        return None
+
+    def _start_api_server(self, host: str = "127.0.0.1", port: int = 8000) -> None:
+        """
+        Start the FastAPI server (uvicorn) in a background thread.
+        Keeps Python authoritative for rendering/generation/email.
+        """
+        if self._is_port_open(host, port):
+            return
+
+        def _run() -> None:
+            try:
+                import uvicorn
+
+                config = uvicorn.Config(
+                    api_app,
+                    host=host,
+                    port=port,
+                    log_level="warning",
+                    access_log=False,
+                )
+                uvicorn.Server(config).run()
+            except Exception:
+                return
+
+        threading.Thread(target=_run, name="idcard-api", daemon=True).start()
+
+        # Best-effort: wait briefly so the Angular UI can call the API immediately.
+        for _ in range(20):
+            if self._is_port_open(host, port):
+                break
+            time.sleep(0.05)
+
+    def _find_free_port(self, host: str = "127.0.0.1") -> int:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((host, 0))
+            return int(s.getsockname()[1])
+
+    def _start_static_server(self, directory: Path, host: str = "127.0.0.1") -> str:
+        """
+        Toga's WinForms WebView only accepts http/https URLs. Serve built Angular
+        files from a local HTTP server when the dev server isn't running.
+        """
+        if self._static_port is not None and self._static_httpd is not None:
+            return f"http://{host}:{self._static_port}/"
+
+        if not directory.exists():
+            return "about:blank"
+
+        port = self._find_free_port(host)
+        handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
+        httpd = ThreadingHTTPServer((host, port), handler)
+
+        def _run() -> None:
+            try:
+                httpd.serve_forever()
+            except Exception:
+                pass
+
+        t = threading.Thread(target=_run, name="idcard-web-static", daemon=True)
+        t.start()
+
+        self._static_httpd = httpd
+        self._static_thread = t
+        self._static_port = port
+        return f"http://{host}:{port}/"
+
+    def _start_placeholder_ui(self, host: str = "127.0.0.1") -> str:
+        """
+        Start a tiny static server hosting a placeholder page.
+        This is used when neither the Angular dev server nor a built dist is available.
+        """
+        tmp_dir = Path(tempfile.mkdtemp(prefix="idcard-maker-ui-"))
+        index = tmp_dir / "index.html"
+        index.write_text(
+            """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ID Card Maker</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; }
+      code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+      .card { max-width: 900px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; }
+      h1 { margin: 0 0 10px; font-size: 18px; }
+      p { margin: 8px 0; color: #111827; }
+      .muted { color: #6b7280; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>ID Card Maker UI not found</h1>
+      <p>Start the Angular dev server:</p>
+      <p><code>cd frontend</code></p>
+      <p><code>npm start</code></p>
+      <p class="muted">Then restart this app (or set <code>IDCARD_WEB_URL</code>).</p>
+    </div>
+  </body>
+</html>
+""",
+            encoding="utf-8",
+        )
+        return self._start_static_server(tmp_dir, host=host)
+
+    def _resolve_web_url(self) -> str:
+        override = (os.environ.get("IDCARD_WEB_URL") or "").strip()
+        if override:
+            return override
+
+        # Prefer Angular dev server if running (npm start).
+        dev_url = self._find_running_dev_server_url()
+        if dev_url:
+            return dev_url
+
+        # Fall back to local build output if present.
+        dist_index = self._find_built_dist_index()
+        if dist_index is not None:
+            return self._start_static_server(dist_index.parent)
+
+        # Last resort: serve a placeholder page over HTTP (WebView requires http/https).
+        return self._start_placeholder_ui()
+
+    async def open_help(self, widget=None):
+        help_path = resource_path(self, "help.html")
+        if help_path.exists():
+            try:
+                webbrowser.open(help_path.as_uri())
+            except Exception:
+                pass
 
     def startup(self):
-        # Main window
         self.main_window: toga.MainWindow = toga.MainWindow(
             title=APP_TITLE,
-            resizable=False,
+            resizable=True,
         )
 
-        # Build UI + controller
-        actions = Actions(self)
-        ui = build_ui(self)
-        self.ui = ui
+        # Start backend API in-process (no business logic duplication in Angular).
+        self._start_api_server()
 
         # Help (opens system browser)
         self.commands.add(
             toga.Command(
-                actions.open_help,
+                self.open_help,
                 text="Help",
                 tooltip="View the user guide",
                 group=toga.Group.HELP,
@@ -38,62 +231,24 @@ class IDCardApp(toga.App):
             )
         )
 
-        # ---- Remove the built-in "Visit Home Page" item, if any ----
+        # Remove built-in "Visit Home Page" item, if any.
         try:
             for cmd in list(self.commands):
                 text = (getattr(cmd, "text", "") or "").strip().lower()
                 grp = getattr(cmd, "group", None)
-                # catch variants like "Visit home page", "Home page", etc.
                 if grp == toga.Group.HELP and ("visit" in text and "home" in text and "page" in text):
                     try:
-                        self.commands.remove(cmd)   # preferred (supported in modern Toga)
+                        self.commands.remove(cmd)
                     except Exception:
-                        cmd.enabled = False         # fallback: disable if removal not supported
+                        cmd.enabled = False
         except Exception:
             pass
 
-        # Wire buttons / actions
-        ui.pick_template_btn.on_press   = actions.choose_template
-        ui.pick_signature_btn.on_press  = actions.choose_signature
-        ui.load_csv_btn.on_press        = actions.load_csv
-        ui.add_member_btn.on_press      = actions.save_member       # unified Add/Update handler
-        ui.new_member_btn.on_press      = actions.new_member        # force Add mode (clear fields)
-        ui.generate_all_btn.on_press    = actions.generate_all_from_table
-        ui.clear_cards_btn.on_press     = actions.clear_cards
-        ui.email_selected_btn.on_press  = actions.email_selected
-        ui.email_all_btn.on_press       = actions.email_all_from_table
-        ui.save_table_btn.on_press      = actions.save_table
+        web_url = self._resolve_web_url()
+        webview = toga.WebView(url=web_url, style=toga.style.Pack(flex=1))
 
-        # Table selection -> populate fields + preview; switch to Update mode
-        ui.csv_table.on_select          = actions.on_table_select
-
-        # Attach UI and show window early (so refresh calls below are valid)
-        self.main_window.content = ui.container
+        self.main_window.content = webview
         self.main_window.show()
-
-        # Match stripe width to window width
-        win_w, _ = self.main_window.size
-        ui.stripe_view.style.width = win_w
-
-        # ---------- Default template (packaging-safe) ----------
-        default_tpl = resource_path(self, "template.png")
-        if default_tpl.exists():
-            if not hasattr(ui, "state"):
-                ui.state = SimpleNamespace()
-
-            actions.template_path = default_tpl
-            ui.state.template_path = default_tpl
-
-            try:
-                img = toga.Image(src=str(default_tpl))
-                ui.preview_imageview.image = img
-                ui.preview_imageview.refresh()
-            except Exception:
-                pass
-
-            ui.status_label.text = f"Template: {default_tpl.name}"
-        else:
-            ui.status_label.text = "Default template not found; choose a template…"
 
         # Optional app icon (packaging-safe)
         logo_path = resource_path(self, "logo.png")
@@ -103,25 +258,11 @@ class IDCardApp(toga.App):
             except Exception:
                 pass
 
-        # Enforce the “template + signature required” edit lock at startup
-        actions.apply_editing_lock()
-
-        # Live preview while typing (name/id/date/email)
-        ui.name_input.on_change = actions.update_preview
-        ui.id_input.on_change   = actions.update_preview
-        ui.date_input.on_change = actions.update_preview
-        if hasattr(ui, "email_input"):
-            ui.email_input.on_change = actions.update_preview
-
-        # Start in "Add" mode
-        ui.add_member_btn.text = "Add member"
-
 
 def main():
     app = IDCardApp(
         formal_name=APP_TITLE,
-        app_id="ca.cupe3523.idcard_maker",  # reverse-DNS bundle id; safe for packaging
-        # Do NOT pass home_page here
+        app_id="ca.cupe3523.idcard_maker",
     )
     # Explicitly clear any home page so Toga doesn't add "Visit Home Page"
     try:
@@ -132,5 +273,4 @@ def main():
 
 
 if __name__ == "__main__":
-    app = main()
-    app.main_loop()
+    main().main_loop()

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from PIL import Image
 
@@ -36,6 +37,18 @@ from .services.mailer import SMTPConfig, Mailer, build_message
 
 
 app = FastAPI(title="ID Card Maker API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_DEFAULT_FONT_PATH: Optional[Path] = Path(__file__).resolve().parent / "resources" / "courbd.ttf"
+if not _DEFAULT_FONT_PATH.exists():
+    _DEFAULT_FONT_PATH = None
 
 
 class MemberIn(BaseModel):
@@ -188,7 +201,7 @@ def generate(body: GenerateIn) -> GenerateOut:
             date=(date_norm or ""),
             template=template,
             signature=signature,
-            font_path=None,
+            font_path=_DEFAULT_FONT_PATH,
         )
 
         out_dir = project_output_dir()
@@ -237,7 +250,7 @@ async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
 
         ok = skipped = errors = 0
         results: list[GenerateBatchResult] = []
-        async for idx, result in generate_batch_cards(rows, template, signature, None, out_dir):
+        async for idx, result in generate_batch_cards(rows, template, signature, _DEFAULT_FONT_PATH, out_dir):
             if result == "ok":
                 ok += 1
             elif result == "skip":
@@ -379,7 +392,7 @@ async def email(body: EmailIn) -> EmailOut:
                             date=(date_norm or ""),
                             template=template,
                             signature=signature,
-                            font_path=None,
+                            font_path=_DEFAULT_FONT_PATH,
                         )
                         canvas.save(attach, format="PNG")
 

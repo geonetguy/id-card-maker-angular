@@ -22,6 +22,61 @@ def _generate_barcode(id_number: str, font_path: Optional[Path]) -> Image.Image:
     return code39.render(writer_options=writer_opts)
 
 
+def _text_width_px(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
+    try:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        return int(bbox[2] - bbox[0])
+    except Exception:
+        try:
+            return int(draw.textlength(text, font=font))  # type: ignore[arg-type]
+        except Exception:
+            return len(text) * 10
+
+
+def _fit_font_to_width_px(
+    *,
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font_path: Optional[Path],
+    start_size: int,
+    min_size: int,
+    max_width_px: int,
+) -> ImageFont.ImageFont:
+    if not (font_path and font_path.exists()):
+        return ImageFont.load_default()
+
+    for size in range(start_size, max(min_size, 1) - 1, -1):
+        try:
+            font = ImageFont.truetype(str(font_path), size)
+        except OSError:
+            return ImageFont.load_default()
+        if _text_width_px(draw, text, font) <= max_width_px:
+            return font
+
+    try:
+        return ImageFont.truetype(str(font_path), max(min_size, 1))
+    except OSError:
+        return ImageFont.load_default()
+
+
+def _draw_centered_in_xrange(
+    *,
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    y: int,
+    x_left: int,
+    x_right: int,
+    fill: str = "black",
+) -> None:
+    x_left = int(x_left)
+    x_right = int(x_right)
+    width = max(1, x_right - x_left)
+    text_w = _text_width_px(draw, text, font)
+    x = x_left + max(0, int((width - text_w) / 2))
+    draw.text((x, y), text, fill=fill, font=font)
+
+
 def generate_id_card(
     *,
     name: str,
@@ -40,23 +95,61 @@ def generate_id_card(
     """
     img = template.copy().convert("RGBA")
     draw = ImageDraw.Draw(img)
+    tpl_w, _ = img.size
 
     # Fonts
     try:
-        font_name = ImageFont.truetype(str(font_path), FONT_SIZE_NAME) if font_path else ImageFont.load_default()
+        # Use the provided TTF (courbd.ttf) when available to preserve monospace alignment.
+        # Name is the most prominent field: slightly larger for readability.
+        font_name = ImageFont.truetype(str(font_path), FONT_SIZE_NAME + 6) if font_path else ImageFont.load_default()
         font_other = ImageFont.truetype(str(font_path), FONT_SIZE_OTHER) if font_path else ImageFont.load_default()
     except OSError:
         font_name = font_other = ImageFont.load_default()
 
-    # Character-based centering (faithful to original)
-    name_text = f"{(name or '').center(39)}"
-    id_text = f"{(id_number or '').center(14)}"
-    date_text = f"{(date or '').center(11)}"
+    # Field bounds (pixel-based). This template is currently fixed-layout.
+    # Adjust these bounds if the artwork changes.
+    NAME_X1, NAME_X2 = 70, tpl_w - 70
+    ID_X1, ID_X2 = 0, 185
+    # Date was visually landing slightly right; shift the date field a bit left.
+    DATE_X1, DATE_X2 = 172, 337
+
+    name_text = (name or "").strip()
+    id_text = (id_number or "").strip()
+    date_text = (date or "").strip()
 
     # Fixed text positions
-    draw.text((0, 98), name_text, fill="black", font=font_name)
-    draw.text((0, 220), id_text, fill="black", font=font_other)
-    draw.text((185, 220), date_text, fill="black", font=font_other)
+    if name_text:
+        name_font = _fit_font_to_width_px(
+            draw=draw,
+            text=name_text,
+            font_path=font_path,
+            start_size=FONT_SIZE_NAME + 6,
+            min_size=14,
+            max_width_px=(NAME_X2 - NAME_X1),
+        )
+        _draw_centered_in_xrange(draw=draw, text=name_text, font=name_font, y=98, x_left=NAME_X1, x_right=NAME_X2)
+
+    if id_text:
+        id_font = _fit_font_to_width_px(
+            draw=draw,
+            text=id_text,
+            font_path=font_path,
+            start_size=FONT_SIZE_OTHER,
+            min_size=12,
+            max_width_px=(ID_X2 - ID_X1),
+        )
+        _draw_centered_in_xrange(draw=draw, text=id_text, font=id_font, y=220, x_left=ID_X1, x_right=ID_X2)
+
+    if date_text:
+        date_font = _fit_font_to_width_px(
+            draw=draw,
+            text=date_text,
+            font_path=font_path,
+            start_size=FONT_SIZE_OTHER,
+            min_size=12,
+            max_width_px=(DATE_X2 - DATE_X1),
+        )
+        _draw_centered_in_xrange(draw=draw, text=date_text, font=date_font, y=220, x_left=DATE_X1, x_right=DATE_X2)
 
     # Signature (optional) - scale to fit bounding box and center within it
     if signature is not None:
@@ -85,7 +178,6 @@ def generate_id_card(
     if id_number:
         code_img = _generate_barcode(id_number, font_path).convert("RGBA")
         code_img = code_img.resize((350, 50), Image.LANCZOS)
-        tpl_w, _ = img.size
         barcode_x = (tpl_w - 350) // 2
         img.alpha_composite(code_img, (barcode_x, 266))
 
