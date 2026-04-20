@@ -22,6 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Callable
 from typing import Optional
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -156,17 +157,36 @@ class ChooseOutputDirOut(BaseModel):
     output_dir: Optional[str] = None
 
 
-class EmailSettings(BaseModel):
-    host: str = ""
-    port: int = 587
-    use_tls: bool = True
-    use_ssl: bool = False
-    username: str = ""
+_DEFAULT_SUBJECT_TPL = "Your ID card, {name}"
+_DEFAULT_BODY_TPL = "Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}"
+
+
+EmailProvider = Literal["microsoft", "gmail"]
+
+
+class EmailAccountSettings(BaseModel):
+    email: str = ""
     password: str = ""
+    save_password: bool = False
     from_name: str = ""
-    from_email: str = ""
-    subject_tpl: str = "Your ID card, {name}"
-    body_tpl: str = "Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}"
+    subject_tpl: str = _DEFAULT_SUBJECT_TPL
+    body_tpl: str = _DEFAULT_BODY_TPL
+
+
+class EmailProviderDefaults(BaseModel):
+    imap_server: str
+    imap_port: int
+    imap_encryption: str  # "SSL/TLS"
+    smtp_server: str
+    smtp_port: int
+    smtp_encryption: str  # "STARTTLS" or "SSL/TLS"
+
+
+class EmailSettingsV2(BaseModel):
+    active: EmailProvider = "microsoft"
+    microsoft: EmailAccountSettings = Field(default_factory=EmailAccountSettings)
+    gmail: EmailAccountSettings = Field(default_factory=EmailAccountSettings)
+    defaults: dict[EmailProvider, EmailProviderDefaults] = Field(default_factory=dict)
 
 
 def _settings_path() -> Path:
@@ -208,6 +228,66 @@ def _write_settings_json(data: dict) -> None:
             pass
 
 
+def _email_defaults() -> dict[EmailProvider, EmailProviderDefaults]:
+    return {
+        "microsoft": EmailProviderDefaults(
+            imap_server="outlook.office365.com",
+            imap_port=993,
+            imap_encryption="SSL/TLS",
+            smtp_server="smtp.office365.com",
+            smtp_port=587,
+            smtp_encryption="STARTTLS",
+        ),
+        "gmail": EmailProviderDefaults(
+            imap_server="imap.gmail.com",
+            imap_port=993,
+            imap_encryption="SSL/TLS",
+            smtp_server="smtp.gmail.com",
+            smtp_port=587,
+            smtp_encryption="STARTTLS",
+        ),
+    }
+
+
+def _email_settings_from_json(data: dict) -> EmailSettingsV2:
+    """
+    Load settings; supports migrating the older single-account schema.
+    """
+    defaults = _email_defaults()
+
+    raw = data.get("email") if isinstance(data, dict) else None
+    if isinstance(raw, dict) and ("microsoft" in raw or "gmail" in raw or "active" in raw):
+        try:
+            settings = EmailSettingsV2(**raw)
+            settings.defaults = defaults
+            return settings
+        except Exception:
+            pass
+
+    # Migration from prior schema (host/port/use_tls/use_ssl/username/password/from_*/subject_tpl/body_tpl)
+    ms = EmailAccountSettings()
+    if isinstance(raw, dict):
+        from_email = (raw.get("from_email") or raw.get("username") or "").strip()
+        ms.email = str(from_email)
+        ms.password = str(raw.get("password") or "")
+        ms.from_name = str(raw.get("from_name") or "")
+        ms.subject_tpl = str(raw.get("subject_tpl") or _DEFAULT_SUBJECT_TPL)
+        ms.body_tpl = str(raw.get("body_tpl") or _DEFAULT_BODY_TPL)
+        ms.save_password = bool(ms.password)
+
+    settings = EmailSettingsV2(active="microsoft", microsoft=ms, gmail=EmailAccountSettings(), defaults=defaults)
+    return settings
+
+
+def _email_settings_to_json(settings: EmailSettingsV2) -> dict:
+    # Do not persist provider defaults; they're built-in.
+    return {
+        "active": settings.active,
+        "microsoft": settings.microsoft.model_dump(),
+        "gmail": settings.gmail.model_dump(),
+    }
+
+
 class DownloadIn(BaseModel):
     output_dir: Optional[str] = None
     filename: str = Field(..., min_length=1)
@@ -234,9 +314,9 @@ class SMTPConfigIn(BaseModel):
 
 class EmailIn(BaseModel):
     members: list[MemberLooseIn] = Field(default_factory=list)
-    smtp: SMTPConfigIn
-    subject_tpl: str = "Your ID card, {name}"
-    body_tpl: str = "Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}"
+    smtp: Optional[SMTPConfigIn] = None
+    subject_tpl: str = _DEFAULT_SUBJECT_TPL
+    body_tpl: str = _DEFAULT_BODY_TPL
     # Optional: if attachment doesn't exist, API can generate it using these assets
     template_base64: Optional[str] = None
     signature_base64: Optional[str] = None
@@ -268,23 +348,29 @@ def config() -> ConfigOut:
     return ConfigOut(output_dir=(override or None))
 
 
-@app.get("/settings/email", response_model=EmailSettings)
-def get_email_settings() -> EmailSettings:
+@app.get("/settings/email", response_model=EmailSettingsV2)
+def get_email_settings() -> EmailSettingsV2:
     data = _read_settings_json()
-    raw = data.get("email", {}) if isinstance(data, dict) else {}
-    try:
-        return EmailSettings(**(raw or {}))
-    except Exception:
-        return EmailSettings()
+    return _email_settings_from_json(data if isinstance(data, dict) else {})
 
 
-@app.put("/settings/email", response_model=EmailSettings)
-def put_email_settings(body: EmailSettings) -> EmailSettings:
+@app.put("/settings/email", response_model=EmailSettingsV2)
+def put_email_settings(body: EmailSettingsV2) -> EmailSettingsV2:
     data = _read_settings_json()
     if not isinstance(data, dict):
         data = {}
-    data["email"] = body.model_dump()
+
+    # Ensure we don't store a password unless the user explicitly opted in.
+    if not body.microsoft.save_password:
+        body.microsoft.password = ""
+    if not body.gmail.save_password:
+        body.gmail.password = ""
+
+    data["email"] = _email_settings_to_json(body)
     _write_settings_json(data)
+
+    # Always return with baked-in defaults.
+    body.defaults = _email_defaults()
     return body
 
 
@@ -541,16 +627,43 @@ async def email(body: EmailIn) -> EmailOut:
     if not body.members:
         raise HTTPException(status_code=400, detail="members is required")
 
-    cfg = SMTPConfig(
-        host=body.smtp.host,
-        port=body.smtp.port,
-        use_tls=body.smtp.use_tls,
-        use_ssl=body.smtp.use_ssl,
-        username=body.smtp.username,
-        password=body.smtp.password,
-        from_name=body.smtp.from_name,
-        from_email=body.smtp.from_email,
-    )
+    # Use provided SMTP config if present; otherwise, use the active saved account.
+    if body.smtp is not None:
+        cfg = SMTPConfig(
+            host=body.smtp.host,
+            port=body.smtp.port,
+            use_tls=body.smtp.use_tls,
+            use_ssl=body.smtp.use_ssl,
+            username=body.smtp.username,
+            password=body.smtp.password,
+            from_name=body.smtp.from_name,
+            from_email=body.smtp.from_email,
+        )
+        subject_tpl = body.subject_tpl
+        body_tpl = body.body_tpl
+    else:
+        settings = _email_settings_from_json(_read_settings_json())
+        provider = settings.active
+        acct = settings.microsoft if provider == "microsoft" else settings.gmail
+        d = settings.defaults.get(provider) or _email_defaults()[provider]
+
+        email_addr = (acct.email or "").strip()
+        password = (acct.password or "").strip()
+        if not email_addr or not password:
+            raise HTTPException(status_code=400, detail="active_email_account_requires_email_and_password")
+
+        cfg = SMTPConfig(
+            host=d.smtp_server,
+            port=d.smtp_port,
+            use_tls=(d.smtp_encryption.upper().startswith("STARTTLS")),
+            use_ssl=(d.smtp_encryption.upper().startswith("SSL")),
+            username=email_addr,
+            password=password,
+            from_name=acct.from_name,
+            from_email=email_addr,
+        )
+        subject_tpl = acct.subject_tpl or _DEFAULT_SUBJECT_TPL
+        body_tpl = acct.body_tpl or _DEFAULT_BODY_TPL
 
     if not (cfg.host or "").strip() or not (cfg.from_email or "").strip():
         raise HTTPException(status_code=400, detail="smtp.host and smtp.from_email are required")
@@ -613,8 +726,8 @@ async def email(body: EmailIn) -> EmailOut:
                     msg = build_message(
                         smtp=cfg,
                         to_email=to_email,
-                        subject=render_tpl(body.subject_tpl, m),
-                        body_text=render_tpl(body.body_tpl, m),
+                        subject=render_tpl(subject_tpl, m),
+                        body_text=render_tpl(body_tpl, m),
                         attachments=[attach],
                     )
                     mailer.send(msg)

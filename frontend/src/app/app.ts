@@ -26,17 +26,28 @@ type ChooseOutputDirOut = { output_dir?: string | null };
 type OpenPathOut = { ok: boolean };
 type EmailResult = { index: number; result: 'sent' | 'skipped' | 'error'; message?: string | null };
 type EmailOut = { total: number; sent: number; skipped: number; errors: number; results: EmailResult[] };
-type EmailSettings = {
-  host: string;
-  port: number;
-  use_tls: boolean;
-  use_ssl: boolean;
-  username: string;
+type EmailProvider = 'microsoft' | 'gmail';
+type EmailAccountSettings = {
+  email: string;
   password: string;
+  save_password: boolean;
   from_name: string;
-  from_email: string;
   subject_tpl: string;
   body_tpl: string;
+};
+type EmailProviderDefaults = {
+  imap_server: string;
+  imap_port: number;
+  imap_encryption: string;
+  smtp_server: string;
+  smtp_port: number;
+  smtp_encryption: string;
+};
+type EmailSettingsV2 = {
+  active: EmailProvider;
+  microsoft: EmailAccountSettings;
+  gmail: EmailAccountSettings;
+  defaults: Record<EmailProvider, EmailProviderDefaults>;
 };
 
 @Component({
@@ -72,18 +83,23 @@ export class App {
   protected readonly generateStatus = signal<string | null>(null);
   protected readonly lastGenerated = signal<GenerateOut | null>(null);
 
-  protected readonly smtpHost = signal('');
-  protected readonly smtpPort = signal('587');
-  protected readonly smtpUseTls = signal(true);
-  protected readonly smtpUseSsl = signal(false);
-  protected readonly smtpUsername = signal('');
-  protected readonly smtpPassword = signal('');
-  protected readonly smtpFromName = signal('');
-  protected readonly smtpFromEmail = signal('');
-  protected readonly saveEmailPassword = signal(false);
+  protected readonly settingsOpen = signal(false);
+  protected readonly emailActive = signal<EmailProvider>('microsoft');
+  protected readonly emailDefaults = signal<Record<EmailProvider, EmailProviderDefaults> | null>(null);
 
-  protected readonly emailSubjectTpl = signal('Your ID card, {name}');
-  protected readonly emailBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
+  protected readonly msEmail = signal('');
+  protected readonly msPassword = signal('');
+  protected readonly msSavePassword = signal(false);
+  protected readonly msFromName = signal('');
+  protected readonly msSubjectTpl = signal('Your ID card, {name}');
+  protected readonly msBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
+
+  protected readonly gmailEmail = signal('');
+  protected readonly gmailPassword = signal('');
+  protected readonly gmailSavePassword = signal(false);
+  protected readonly gmailFromName = signal('');
+  protected readonly gmailSubjectTpl = signal('Your ID card, {name}');
+  protected readonly gmailBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
 
   protected readonly emailStatus = signal<string | null>(null);
   protected readonly emailResult = signal<EmailOut | null>(null);
@@ -105,6 +121,15 @@ export class App {
     }
 
     await this.loadEmailSettings();
+  }
+
+  protected openSettings(): void {
+    this.settingsStatus.set(null);
+    this.settingsOpen.set(true);
+  }
+
+  protected closeSettings(): void {
+    this.settingsOpen.set(false);
   }
 
   protected onTextChange(kind: 'name' | 'id' | 'date' | 'email', value: string): void {
@@ -348,22 +373,49 @@ export class App {
   protected onSmtpChange(): void {}
   protected onEmailTplChange(): void {}
 
+  protected currentEmail(): string {
+    return this.emailActive() === 'microsoft' ? this.msEmail() : this.gmailEmail();
+  }
+
+  protected currentPassword(): string {
+    return this.emailActive() === 'microsoft' ? this.msPassword() : this.gmailPassword();
+  }
+
+  protected currentFromName(): string {
+    return this.emailActive() === 'microsoft' ? this.msFromName() : this.gmailFromName();
+  }
+
+  protected currentSubjectTpl(): string {
+    return this.emailActive() === 'microsoft' ? this.msSubjectTpl() : this.gmailSubjectTpl();
+  }
+
+  protected currentBodyTpl(): string {
+    return this.emailActive() === 'microsoft' ? this.msBodyTpl() : this.gmailBodyTpl();
+  }
+
   protected async loadEmailSettings(): Promise<void> {
     try {
       const s = await firstValueFrom(
-        this.http.get<EmailSettings>(`${this.apiBase}/settings/email`)
+        this.http.get<EmailSettingsV2>(`${this.apiBase}/settings/email`)
       );
       if (!s) return;
-      this.smtpHost.set((s.host ?? '').toString());
-      this.smtpPort.set(String(s.port ?? 587));
-      this.smtpUseTls.set(!!s.use_tls);
-      this.smtpUseSsl.set(!!s.use_ssl);
-      this.smtpUsername.set((s.username ?? '').toString());
-      this.smtpPassword.set((s.password ?? '').toString());
-      this.smtpFromName.set((s.from_name ?? '').toString());
-      this.smtpFromEmail.set((s.from_email ?? '').toString());
-      this.emailSubjectTpl.set((s.subject_tpl ?? this.emailSubjectTpl()).toString());
-      this.emailBodyTpl.set((s.body_tpl ?? this.emailBodyTpl()).toString());
+
+      this.emailActive.set(s.active ?? 'microsoft');
+      this.emailDefaults.set(s.defaults ?? null);
+
+      this.msEmail.set((s.microsoft?.email ?? '').toString());
+      this.msPassword.set((s.microsoft?.password ?? '').toString());
+      this.msSavePassword.set(!!s.microsoft?.save_password);
+      this.msFromName.set((s.microsoft?.from_name ?? '').toString());
+      this.msSubjectTpl.set((s.microsoft?.subject_tpl ?? this.msSubjectTpl()).toString());
+      this.msBodyTpl.set((s.microsoft?.body_tpl ?? this.msBodyTpl()).toString());
+
+      this.gmailEmail.set((s.gmail?.email ?? '').toString());
+      this.gmailPassword.set((s.gmail?.password ?? '').toString());
+      this.gmailSavePassword.set(!!s.gmail?.save_password);
+      this.gmailFromName.set((s.gmail?.from_name ?? '').toString());
+      this.gmailSubjectTpl.set((s.gmail?.subject_tpl ?? this.gmailSubjectTpl()).toString());
+      this.gmailBodyTpl.set((s.gmail?.body_tpl ?? this.gmailBodyTpl()).toString());
     } catch {
       // ignore; API may not be up yet
     }
@@ -373,22 +425,34 @@ export class App {
     this.settingsStatus.set(null);
     this.isSavingSettings.set(true);
     try {
-      const portNum = Number.parseInt(this.smtpPort().trim() || '587', 10);
-      const payload: EmailSettings = {
-        host: this.smtpHost().trim(),
-        port: Number.isFinite(portNum) ? portNum : 587,
-        use_tls: this.smtpUseTls(),
-        use_ssl: this.smtpUseSsl(),
-        username: this.smtpUsername(),
-        password: this.saveEmailPassword() ? this.smtpPassword() : '',
-        from_name: this.smtpFromName(),
-        from_email: this.smtpFromEmail(),
-        subject_tpl: this.emailSubjectTpl(),
-        body_tpl: this.emailBodyTpl(),
+      const payload: EmailSettingsV2 = {
+        active: this.emailActive(),
+        microsoft: {
+          email: this.msEmail().trim(),
+          password: this.msPassword(),
+          save_password: this.msSavePassword(),
+          from_name: this.msFromName(),
+          subject_tpl: this.msSubjectTpl(),
+          body_tpl: this.msBodyTpl(),
+        },
+        gmail: {
+          email: this.gmailEmail().trim(),
+          password: this.gmailPassword(),
+          save_password: this.gmailSavePassword(),
+          from_name: this.gmailFromName(),
+          subject_tpl: this.gmailSubjectTpl(),
+          body_tpl: this.gmailBodyTpl(),
+        },
+        defaults: this.emailDefaults() ?? ({} as any),
       };
-      await firstValueFrom(this.http.put(`${this.apiBase}/settings/email`, payload));
+
+      const resp = await firstValueFrom(this.http.put<EmailSettingsV2>(`${this.apiBase}/settings/email`, payload));
+      if (resp?.defaults) this.emailDefaults.set(resp.defaults);
       this.settingsStatus.set('Saved.');
-      if (!this.saveEmailPassword()) this.smtpPassword.set('');
+
+      // If the user didn't opt in to save the password, clear it locally too.
+      if (!this.msSavePassword()) this.msPassword.set('');
+      if (!this.gmailSavePassword()) this.gmailPassword.set('');
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to save settings.';
       this.settingsStatus.set(String(msg));
@@ -409,16 +473,19 @@ export class App {
       return;
     }
 
-    const host = this.smtpHost().trim();
-    const fromEmail = this.smtpFromEmail().trim();
-    if (!host || !fromEmail) {
-      this.error.set('SMTP host and From email are required.');
+    const emailAddr = this.currentEmail().trim();
+    const password = this.currentPassword();
+    const defaults = this.emailDefaults();
+    const provider = this.emailActive();
+    const d = defaults?.[provider];
+
+    if (!emailAddr || !password) {
+      this.error.set('Enter email + password for the active account in Email settings.');
+      this.openSettings();
       return;
     }
-
-    const portNum = Number.parseInt(this.smtpPort().trim() || '587', 10);
-    if (!Number.isFinite(portNum) || portNum <= 0) {
-      this.error.set('SMTP port must be a number.');
+    if (!d) {
+      this.error.set('Email defaults not loaded yet. Try again.');
       return;
     }
 
@@ -430,17 +497,17 @@ export class App {
       const payload = {
         members: rows,
         smtp: {
-          host,
-          port: portNum,
-          use_tls: this.smtpUseTls(),
-          use_ssl: this.smtpUseSsl(),
-          username: this.smtpUsername(),
-          password: this.smtpPassword(),
-          from_name: this.smtpFromName(),
-          from_email: fromEmail,
+          host: d.smtp_server,
+          port: d.smtp_port,
+          use_tls: (d.smtp_encryption ?? '').toUpperCase().startsWith('STARTTLS'),
+          use_ssl: (d.smtp_encryption ?? '').toUpperCase().startsWith('SSL'),
+          username: emailAddr,
+          password,
+          from_name: this.currentFromName(),
+          from_email: emailAddr,
         },
-        subject_tpl: this.emailSubjectTpl(),
-        body_tpl: this.emailBodyTpl(),
+        subject_tpl: this.currentSubjectTpl(),
+        body_tpl: this.currentBodyTpl(),
         template_base64: this.templateBase64(),
         signature_base64: this.signatureBase64(),
         output_dir: this.outputDir().trim() || null,

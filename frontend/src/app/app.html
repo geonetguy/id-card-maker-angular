@@ -1,7 +1,11 @@
 <div class="app">
   <header class="header">
     <div class="header__title">ID Card Maker</div>
-    <div class="header__hint">Step D3: Preview slice (Angular UI only).</div>
+    <div class="header__hint">Step D3: Angular UI + Python backend.</div>
+    <div class="header__menu">
+      <div class="pill">Active email: {{ emailActive() === 'microsoft' ? 'Microsoft' : 'Gmail' }}</div>
+      <button class="btn btn--secondary" (click)="openSettings()">Email settings</button>
+    </div>
   </header>
 
   <div class="grid">
@@ -103,88 +107,11 @@
         </div>
       </div>
 
-      <h2>Email</h2>
-
-      <div class="actions">
-        <button class="btn btn--secondary" (click)="saveEmailSettings()" [disabled]="isLoading() || isSavingSettings()">
-          Save settings
-        </button>
-        <span class="status" *ngIf="settingsStatus()">{{ settingsStatus() }}</span>
-      </div>
-
-      <div class="field">
-        <label class="label">SMTP host</label>
-        <input class="input" [value]="smtpHost()" (input)="smtpHost.set($any($event.target).value); onSmtpChange()" placeholder="smtp.example.com" />
-      </div>
-
-      <div class="field">
-        <label class="label">SMTP port</label>
-        <input class="input" [value]="smtpPort()" (input)="smtpPort.set($any($event.target).value); onSmtpChange()" placeholder="587" />
-      </div>
-
-      <div class="field">
-        <label class="label">Security</label>
-        <div class="row">
-          <label class="checkbox">
-            <input type="checkbox" [checked]="smtpUseTls()" (change)="smtpUseTls.set($any($event.target).checked); onSmtpChange()" />
-            TLS (STARTTLS)
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" [checked]="smtpUseSsl()" (change)="smtpUseSsl.set($any($event.target).checked); onSmtpChange()" />
-            SSL
-          </label>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="label">Username</label>
-        <input class="input" [value]="smtpUsername()" (input)="smtpUsername.set($any($event.target).value); onSmtpChange()" />
-      </div>
-
-      <div class="field">
-        <label class="label">Password</label>
-        <input type="password" class="input" [value]="smtpPassword()" (input)="smtpPassword.set($any($event.target).value); onSmtpChange()" />
-      </div>
-
-      <div class="field">
-        <label class="checkbox">
-          <input type="checkbox" [checked]="saveEmailPassword()" (change)="saveEmailPassword.set($any($event.target).checked)" />
-          Save password (stored in plain text)
-        </label>
-      </div>
-
-      <div class="field">
-        <label class="label">From name</label>
-        <input class="input" [value]="smtpFromName()" (input)="smtpFromName.set($any($event.target).value); onSmtpChange()" />
-      </div>
-
-      <div class="field">
-        <label class="label">From email</label>
-        <input class="input" [value]="smtpFromEmail()" (input)="smtpFromEmail.set($any($event.target).value); onSmtpChange()" placeholder="you@example.com" />
-      </div>
-
-      <div class="field">
-        <label class="label">Subject template</label>
-        <input class="input" [value]="emailSubjectTpl()" (input)="emailSubjectTpl.set($any($event.target).value); onEmailTplChange()" />
-      </div>
-
-      <div class="field">
-        <label class="label">Body template</label>
-        <textarea class="textarea" rows="8" [value]="emailBodyTpl()" (input)="emailBodyTpl.set($any($event.target).value); onEmailTplChange()"></textarea>
-        <div class="hint">
-          Available:
-          <code>{{ '{' }}name{{ '}' }}</code>,
-          <code>{{ '{' }}id_number{{ '}' }}</code>,
-          <code>{{ '{' }}date{{ '}' }}</code>,
-          <code>{{ '{' }}email{{ '}' }}</code>,
-          <code>{{ '{' }}sender{{ '}' }}</code>
-        </div>
-      </div>
-
       <div class="actions">
         <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || members().length === 0">
           Email batch
         </button>
+        <button class="btn btn--secondary" (click)="openSettings()" [disabled]="isLoading()">Email settings</button>
         <span class="status" *ngIf="emailStatus()">{{ emailStatus() }}</span>
       </div>
 
@@ -254,8 +181,126 @@
     <div class="batchSummary" *ngIf="batchResult()">
       <div class="batchSummary__title">Last batch</div>
       <div class="batchSummary__line">
-        Total: {{ batchResult()!.total }} · OK: {{ batchResult()!.ok }} · Skipped: {{ batchResult()!.skipped }} · Errors: {{ batchResult()!.errors }}
+        Total: {{ batchResult()!.total }} &middot; OK: {{ batchResult()!.ok }} &middot; Skipped: {{ batchResult()!.skipped }} &middot; Errors: {{ batchResult()!.errors }}
       </div>
     </div>
   </section>
+</div>
+
+<div class="modalOverlay" *ngIf="settingsOpen()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal__header">
+      <div class="modal__title">Email settings</div>
+      <div class="modal__spacer"></div>
+      <button class="btn btn--ghost" (click)="closeSettings()">Close</button>
+    </div>
+
+    <div class="modal__body">
+      <div class="field">
+        <label class="label">Active email account</label>
+        <div class="row">
+          <label class="checkbox">
+            <input type="radio" name="activeEmail" [checked]="emailActive() === 'microsoft'" (change)="emailActive.set('microsoft')" />
+            Microsoft
+          </label>
+          <label class="checkbox">
+            <input type="radio" name="activeEmail" [checked]="emailActive() === 'gmail'" (change)="emailActive.set('gmail')" />
+            Gmail
+          </label>
+        </div>
+      </div>
+
+      <div class="panel panel--inner" *ngIf="emailActive() === 'microsoft'">
+        <h3>Microsoft account</h3>
+        <div class="hint">
+          SMTP: {{ emailDefaults()?.microsoft?.smtp_server }}:{{ emailDefaults()?.microsoft?.smtp_port }} ({{ emailDefaults()?.microsoft?.smtp_encryption }})<br />
+          IMAP: {{ emailDefaults()?.microsoft?.imap_server }}:{{ emailDefaults()?.microsoft?.imap_port }} ({{ emailDefaults()?.microsoft?.imap_encryption }})
+        </div>
+
+        <div class="field">
+          <label class="label">Email</label>
+          <input class="input" [value]="msEmail()" (input)="msEmail.set($any($event.target).value)" placeholder="you@domain.com" />
+        </div>
+        <div class="field">
+          <label class="label">Password</label>
+          <input type="password" class="input" [value]="msPassword()" (input)="msPassword.set($any($event.target).value)" />
+        </div>
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" [checked]="msSavePassword()" (change)="msSavePassword.set($any($event.target).checked)" />
+            Save password (stored in plain text)
+          </label>
+        </div>
+        <div class="field">
+          <label class="label">From name (optional)</label>
+          <input class="input" [value]="msFromName()" (input)="msFromName.set($any($event.target).value)" />
+        </div>
+        <div class="field">
+          <label class="label">Subject template</label>
+          <input class="input" [value]="msSubjectTpl()" (input)="msSubjectTpl.set($any($event.target).value)" />
+        </div>
+        <div class="field">
+          <label class="label">Body template</label>
+          <textarea class="textarea" rows="8" [value]="msBodyTpl()" (input)="msBodyTpl.set($any($event.target).value)"></textarea>
+          <div class="hint">
+            Available:
+            <code>{{ '{' }}name{{ '}' }}</code>,
+            <code>{{ '{' }}id_number{{ '}' }}</code>,
+            <code>{{ '{' }}date{{ '}' }}</code>,
+            <code>{{ '{' }}email{{ '}' }}</code>,
+            <code>{{ '{' }}sender{{ '}' }}</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel panel--inner" *ngIf="emailActive() === 'gmail'">
+        <h3>Gmail account</h3>
+        <div class="hint">
+          SMTP: {{ emailDefaults()?.gmail?.smtp_server }}:{{ emailDefaults()?.gmail?.smtp_port }} ({{ emailDefaults()?.gmail?.smtp_encryption }})<br />
+          IMAP: {{ emailDefaults()?.gmail?.imap_server }}:{{ emailDefaults()?.gmail?.imap_port }} ({{ emailDefaults()?.gmail?.imap_encryption }})
+        </div>
+
+        <div class="field">
+          <label class="label">Email</label>
+          <input class="input" [value]="gmailEmail()" (input)="gmailEmail.set($any($event.target).value)" placeholder="you@gmail.com" />
+        </div>
+        <div class="field">
+          <label class="label">Password</label>
+          <input type="password" class="input" [value]="gmailPassword()" (input)="gmailPassword.set($any($event.target).value)" />
+        </div>
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" [checked]="gmailSavePassword()" (change)="gmailSavePassword.set($any($event.target).checked)" />
+            Save password (stored in plain text)
+          </label>
+        </div>
+        <div class="field">
+          <label class="label">From name (optional)</label>
+          <input class="input" [value]="gmailFromName()" (input)="gmailFromName.set($any($event.target).value)" />
+        </div>
+        <div class="field">
+          <label class="label">Subject template</label>
+          <input class="input" [value]="gmailSubjectTpl()" (input)="gmailSubjectTpl.set($any($event.target).value)" />
+        </div>
+        <div class="field">
+          <label class="label">Body template</label>
+          <textarea class="textarea" rows="8" [value]="gmailBodyTpl()" (input)="gmailBodyTpl.set($any($event.target).value)"></textarea>
+          <div class="hint">
+            Available:
+            <code>{{ '{' }}name{{ '}' }}</code>,
+            <code>{{ '{' }}id_number{{ '}' }}</code>,
+            <code>{{ '{' }}date{{ '}' }}</code>,
+            <code>{{ '{' }}email{{ '}' }}</code>,
+            <code>{{ '{' }}sender{{ '}' }}</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal__footer">
+      <button class="btn btn--secondary" (click)="loadEmailSettings()" [disabled]="isSavingSettings()">Reload</button>
+      <button class="btn" (click)="saveEmailSettings()" [disabled]="isSavingSettings()">Save</button>
+      <span class="status" *ngIf="settingsStatus()">{{ settingsStatus() }}</span>
+    </div>
+  </div>
 </div>

@@ -50,19 +50,26 @@ def test_email_settings_roundtrip(client: TestClient) -> None:
         assert r.status_code == 200
 
         payload = r.json()
-        payload["host"] = "smtp.example.com"
-        payload["from_email"] = "sender@example.com"
-        payload["password"] = "secret"
-        payload["port"] = 587
+        assert payload["defaults"]["microsoft"]["smtp_server"] == "smtp.office365.com"
+        assert payload["defaults"]["microsoft"]["smtp_port"] == 587
+        assert payload["defaults"]["gmail"]["smtp_server"] == "smtp.gmail.com"
+        assert payload["defaults"]["gmail"]["smtp_port"] == 587
+
+        payload["active"] = "microsoft"
+        payload["microsoft"]["email"] = "sender@example.com"
+        payload["microsoft"]["password"] = "secret"
+        payload["microsoft"]["save_password"] = True
 
         r2 = client.put("/settings/email", json=payload)
         assert r2.status_code == 200
 
         r3 = client.get("/settings/email")
         assert r3.status_code == 200
-        assert r3.json()["host"] == "smtp.example.com"
-        assert r3.json()["from_email"] == "sender@example.com"
-        assert r3.json()["password"] == "secret"
+        data = r3.json()
+        assert data["active"] == "microsoft"
+        assert data["microsoft"]["email"] == "sender@example.com"
+        assert data["microsoft"]["password"] == "secret"
+        assert data["defaults"]["microsoft"]["smtp_server"] == "smtp.office365.com"
     finally:
         try:
             shutil.rmtree(td, ignore_errors=True)
@@ -179,12 +186,21 @@ def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) 
 
 
 def test_email_requires_smtp_fields(client: TestClient) -> None:
-    r = client.post(
-        "/email",
-        json={
-            "members": [{"name": "Test", "id_number": "1", "date": "", "email": "x@example.com"}],
-            "smtp": {"host": "", "port": 587, "use_tls": True, "use_ssl": False, "username": "", "password": "", "from_name": "", "from_email": ""},
-            "output_dir": str(project_output_dir()),
-        },
-    )
-    assert r.status_code == 400
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-email-{uuid.uuid4().hex}"
+    td.mkdir(parents=True, exist_ok=True)
+    try:
+        os.environ["IDCARD_SETTINGS_PATH"] = str(td / "settings.json")
+        r = client.post(
+            "/email",
+            json={
+                "members": [{"name": "Test", "id_number": "1", "date": "", "email": "x@example.com"}],
+                "output_dir": str(project_output_dir()),
+            },
+        )
+        assert r.status_code == 400
+        assert "active_email_account_requires_email_and_password" in str(r.json().get("detail", ""))
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
