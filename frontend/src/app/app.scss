@@ -394,6 +394,10 @@
   background: var(--uip-primary-soft);
 }
 
+.row--placeholder td {
+  height: 44px;
+}
+
 .batchSummary {
   margin-top: 12px;
   padding: 10px;

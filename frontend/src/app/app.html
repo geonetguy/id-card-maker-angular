@@ -71,7 +71,18 @@
       <h2>CSV</h2>
       <div class="field">
         <label class="label">Upload members CSV</label>
-        <input type="file" accept=".csv,text/csv" (change)="onUploadCsv($any($event.target).files?.item(0) ?? null)" />
+        <div class="fileRow">
+          <input
+            #csvFile
+            class="fileInput"
+            type="file"
+            accept=".csv,text/csv"
+            (change)="onUploadCsv($any($event.target).files?.item(0) ?? null)"
+          />
+          <button class="btn btn--secondary" (click)="csvFile.click()" [disabled]="isLoading()">
+            Choose file…
+          </button>
+        </div>
       </div>
 
       <div class="sectionHeader">
@@ -202,7 +213,7 @@
           </div>
         </div>
 
-        <div class="tableWrap" *ngIf="members().length; else emptyTable">
+        <div class="tableWrap">
           <table class="table">
             <thead>
               <tr>
@@ -213,24 +224,31 @@
               </tr>
             </thead>
             <tbody>
-              @for (m of members(); track trackIndex($index)) {
-                <tr
-                  class="row"
-                  [class.row--selected]="selectedIndex() === $index"
-                  (click)="selectRow($index)"
-                >
-                  <td>{{ m.name }}</td>
-                  <td>{{ m.id_number }}</td>
-                  <td>{{ m.date }}</td>
-                  <td>{{ m.email }}</td>
+              @if (members().length) {
+                @for (m of members(); track trackIndex($index)) {
+                  <tr
+                    class="row"
+                    [class.row--selected]="selectedIndex() === $index"
+                    (click)="selectRow($index)"
+                  >
+                    <td>{{ m.name }}</td>
+                    <td>{{ m.id_number }}</td>
+                    <td>{{ m.date }}</td>
+                    <td>{{ m.email }}</td>
+                  </tr>
+                }
+              } @else {
+                <tr class="row row--placeholder">
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
-        <ng-template #emptyTable>
-          <div class="empty">Upload a CSV or add a member to populate the table.</div>
-        </ng-template>
+        <div class="empty" *ngIf="members().length === 0">Upload a CSV or add a member to populate the table.</div>
       </section>
     </div>
   </div>
