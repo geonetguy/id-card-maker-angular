@@ -16,7 +16,9 @@ from __future__ import annotations
 import csv
 import base64
 import io
+import json
 import os
+import uuid
 from pathlib import Path
 from typing import Callable
 from typing import Optional
@@ -154,6 +156,58 @@ class ChooseOutputDirOut(BaseModel):
     output_dir: Optional[str] = None
 
 
+class EmailSettings(BaseModel):
+    host: str = ""
+    port: int = 587
+    use_tls: bool = True
+    use_ssl: bool = False
+    username: str = ""
+    password: str = ""
+    from_name: str = ""
+    from_email: str = ""
+    subject_tpl: str = "Your ID card, {name}"
+    body_tpl: str = "Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}"
+
+
+def _settings_path() -> Path:
+    """
+    Location for persisted user settings.
+
+    In the packaged app, this is injected by the Toga shell via
+    `IDCARD_SETTINGS_PATH`. In development, it falls back to a file in the
+    project root.
+    """
+    override = (os.environ.get("IDCARD_SETTINGS_PATH") or "").strip()
+    if override:
+        return Path(override).expanduser()
+    return Path(__file__).resolve().parents[1] / "idcard_settings.json"
+
+
+def _read_settings_json() -> dict:
+    path = _settings_path()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _write_settings_json(data: dict) -> None:
+    path = _settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    tmp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp_path.replace(path)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 class DownloadIn(BaseModel):
     output_dir: Optional[str] = None
     filename: str = Field(..., min_length=1)
@@ -212,6 +266,26 @@ def health() -> dict[str, str]:
 def config() -> ConfigOut:
     override = (os.environ.get("IDCARD_OUTPUT_DIR") or "").strip()
     return ConfigOut(output_dir=(override or None))
+
+
+@app.get("/settings/email", response_model=EmailSettings)
+def get_email_settings() -> EmailSettings:
+    data = _read_settings_json()
+    raw = data.get("email", {}) if isinstance(data, dict) else {}
+    try:
+        return EmailSettings(**(raw or {}))
+    except Exception:
+        return EmailSettings()
+
+
+@app.put("/settings/email", response_model=EmailSettings)
+def put_email_settings(body: EmailSettings) -> EmailSettings:
+    data = _read_settings_json()
+    if not isinstance(data, dict):
+        data = {}
+    data["email"] = body.model_dump()
+    _write_settings_json(data)
+    return body
 
 
 @app.post("/choose-output-dir", response_model=ChooseOutputDirOut)

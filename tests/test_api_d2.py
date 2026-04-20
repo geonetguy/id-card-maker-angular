@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import base64
 import io
+import os
+import shutil
+import uuid
 from pathlib import Path
 
 import pytest
@@ -34,6 +37,37 @@ def test_config_exists(client: TestClient) -> None:
     r = client.get("/config")
     assert r.status_code == 200
     assert "output_dir" in r.json()
+
+
+def test_email_settings_roundtrip(client: TestClient) -> None:
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-settings-{uuid.uuid4().hex}"
+    td.mkdir(parents=True, exist_ok=True)
+    try:
+        settings_path = td / "settings.json"
+        os.environ["IDCARD_SETTINGS_PATH"] = str(settings_path)
+
+        r = client.get("/settings/email")
+        assert r.status_code == 200
+
+        payload = r.json()
+        payload["host"] = "smtp.example.com"
+        payload["from_email"] = "sender@example.com"
+        payload["password"] = "secret"
+        payload["port"] = 587
+
+        r2 = client.put("/settings/email", json=payload)
+        assert r2.status_code == 200
+
+        r3 = client.get("/settings/email")
+        assert r3.status_code == 200
+        assert r3.json()["host"] == "smtp.example.com"
+        assert r3.json()["from_email"] == "sender@example.com"
+        assert r3.json()["password"] == "secret"
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
 
 
 def test_preview_returns_png_base64(client: TestClient) -> None:

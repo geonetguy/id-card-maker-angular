@@ -277,6 +277,15 @@ class IDCardApp(toga.App):
             resizable=True,
         )
 
+        # Persist settings to a stable per-user location (so WebView origin changes
+        # don't affect storage).
+        try:
+            settings_path = Path(self.paths.app_data) / "settings.json"
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+            os.environ["IDCARD_SETTINGS_PATH"] = str(settings_path)
+        except Exception:
+            pass
+
         # Allow the Angular UI to open a native folder picker via the API.
         set_choose_output_dir_callback(self._choose_output_dir_blocking)
 

@@ -26,6 +26,18 @@ type ChooseOutputDirOut = { output_dir?: string | null };
 type OpenPathOut = { ok: boolean };
 type EmailResult = { index: number; result: 'sent' | 'skipped' | 'error'; message?: string | null };
 type EmailOut = { total: number; sent: number; skipped: number; errors: number; results: EmailResult[] };
+type EmailSettings = {
+  host: string;
+  port: number;
+  use_tls: boolean;
+  use_ssl: boolean;
+  username: string;
+  password: string;
+  from_name: string;
+  from_email: string;
+  subject_tpl: string;
+  body_tpl: string;
+};
 
 @Component({
   selector: 'app-root',
@@ -68,6 +80,7 @@ export class App {
   protected readonly smtpPassword = signal('');
   protected readonly smtpFromName = signal('');
   protected readonly smtpFromEmail = signal('');
+  protected readonly saveEmailPassword = signal(false);
 
   protected readonly emailSubjectTpl = signal('Your ID card, {name}');
   protected readonly emailBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
@@ -75,6 +88,8 @@ export class App {
   protected readonly emailStatus = signal<string | null>(null);
   protected readonly emailResult = signal<EmailOut | null>(null);
   protected readonly isEmailing = signal(false);
+  protected readonly settingsStatus = signal<string | null>(null);
+  protected readonly isSavingSettings = signal(false);
 
   private previewDebounceTimer: number | null = null;
 
@@ -89,26 +104,7 @@ export class App {
       // ignore; API may not be up yet
     }
 
-    try {
-      const raw = localStorage.getItem('idcard.smtp');
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (typeof s.host === 'string') this.smtpHost.set(s.host);
-        if (typeof s.port === 'string') this.smtpPort.set(s.port);
-        if (typeof s.useTls === 'boolean') this.smtpUseTls.set(s.useTls);
-        if (typeof s.useSsl === 'boolean') this.smtpUseSsl.set(s.useSsl);
-        if (typeof s.username === 'string') this.smtpUsername.set(s.username);
-        if (typeof s.password === 'string') this.smtpPassword.set(s.password);
-        if (typeof s.fromName === 'string') this.smtpFromName.set(s.fromName);
-        if (typeof s.fromEmail === 'string') this.smtpFromEmail.set(s.fromEmail);
-      }
-      const subj = localStorage.getItem('idcard.emailSubjectTpl');
-      const body = localStorage.getItem('idcard.emailBodyTpl');
-      if (subj) this.emailSubjectTpl.set(subj);
-      if (body) this.emailBodyTpl.set(body);
-    } catch {
-      // ignore
-    }
+    await this.loadEmailSettings();
   }
 
   protected onTextChange(kind: 'name' | 'id' | 'date' | 'email', value: string): void {
@@ -349,32 +345,56 @@ export class App {
     }
   }
 
-  protected onSmtpChange(): void {
+  protected onSmtpChange(): void {}
+  protected onEmailTplChange(): void {}
+
+  protected async loadEmailSettings(): Promise<void> {
     try {
-      localStorage.setItem(
-        'idcard.smtp',
-        JSON.stringify({
-          host: this.smtpHost(),
-          port: this.smtpPort(),
-          useTls: this.smtpUseTls(),
-          useSsl: this.smtpUseSsl(),
-          username: this.smtpUsername(),
-          password: this.smtpPassword(),
-          fromName: this.smtpFromName(),
-          fromEmail: this.smtpFromEmail(),
-        })
+      const s = await firstValueFrom(
+        this.http.get<EmailSettings>(`${this.apiBase}/settings/email`)
       );
+      if (!s) return;
+      this.smtpHost.set((s.host ?? '').toString());
+      this.smtpPort.set(String(s.port ?? 587));
+      this.smtpUseTls.set(!!s.use_tls);
+      this.smtpUseSsl.set(!!s.use_ssl);
+      this.smtpUsername.set((s.username ?? '').toString());
+      this.smtpPassword.set((s.password ?? '').toString());
+      this.smtpFromName.set((s.from_name ?? '').toString());
+      this.smtpFromEmail.set((s.from_email ?? '').toString());
+      this.emailSubjectTpl.set((s.subject_tpl ?? this.emailSubjectTpl()).toString());
+      this.emailBodyTpl.set((s.body_tpl ?? this.emailBodyTpl()).toString());
     } catch {
-      // ignore
+      // ignore; API may not be up yet
     }
   }
 
-  protected onEmailTplChange(): void {
+  protected async saveEmailSettings(): Promise<void> {
+    this.settingsStatus.set(null);
+    this.isSavingSettings.set(true);
     try {
-      localStorage.setItem('idcard.emailSubjectTpl', this.emailSubjectTpl());
-      localStorage.setItem('idcard.emailBodyTpl', this.emailBodyTpl());
-    } catch {
-      // ignore
+      const portNum = Number.parseInt(this.smtpPort().trim() || '587', 10);
+      const payload: EmailSettings = {
+        host: this.smtpHost().trim(),
+        port: Number.isFinite(portNum) ? portNum : 587,
+        use_tls: this.smtpUseTls(),
+        use_ssl: this.smtpUseSsl(),
+        username: this.smtpUsername(),
+        password: this.saveEmailPassword() ? this.smtpPassword() : '',
+        from_name: this.smtpFromName(),
+        from_email: this.smtpFromEmail(),
+        subject_tpl: this.emailSubjectTpl(),
+        body_tpl: this.emailBodyTpl(),
+      };
+      await firstValueFrom(this.http.put(`${this.apiBase}/settings/email`, payload));
+      this.settingsStatus.set('Saved.');
+      if (!this.saveEmailPassword()) this.smtpPassword.set('');
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to save settings.';
+      this.settingsStatus.set(String(msg));
+      this.error.set(String(msg));
+    } finally {
+      this.isSavingSettings.set(false);
     }
   }
 
@@ -429,9 +449,6 @@ export class App {
       const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
       this.emailResult.set(resp);
       this.emailStatus.set(`Email complete: ${resp.sent} sent, ${resp.skipped} skipped, ${resp.errors} errors.`);
-
-      this.onSmtpChange();
-      this.onEmailTplChange();
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to send email.';
       this.error.set(String(msg));

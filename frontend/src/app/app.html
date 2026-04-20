@@ -105,6 +105,13 @@
 
       <h2>Email</h2>
 
+      <div class="actions">
+        <button class="btn btn--secondary" (click)="saveEmailSettings()" [disabled]="isLoading() || isSavingSettings()">
+          Save settings
+        </button>
+        <span class="status" *ngIf="settingsStatus()">{{ settingsStatus() }}</span>
+      </div>
+
       <div class="field">
         <label class="label">SMTP host</label>
         <input class="input" [value]="smtpHost()" (input)="smtpHost.set($any($event.target).value); onSmtpChange()" placeholder="smtp.example.com" />
@@ -137,6 +144,13 @@
       <div class="field">
         <label class="label">Password</label>
         <input type="password" class="input" [value]="smtpPassword()" (input)="smtpPassword.set($any($event.target).value); onSmtpChange()" />
+      </div>
+
+      <div class="field">
+        <label class="checkbox">
+          <input type="checkbox" [checked]="saveEmailPassword()" (change)="saveEmailPassword.set($any($event.target).checked)" />
+          Save password (stored in plain text)
+        </label>
       </div>
 
       <div class="field">
