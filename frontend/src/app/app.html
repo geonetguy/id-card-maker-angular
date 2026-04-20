@@ -14,31 +14,57 @@
 
       <div class="field">
         <label class="label">Template image (required)</label>
-        <input
-          type="file"
-          accept="image/*"
-          (change)="onPickImage('template', $any($event.target).files?.item(0) ?? null)"
-        />
-        <div class="row">
-          <button class="btn btn--secondary" (click)="chooseDefaultAsset('template')" [disabled]="isLoading()">
-            Choose default…
+        <div class="fileRow">
+          <input
+            #templateFile
+            class="fileInput"
+            type="file"
+            accept="image/*"
+            (change)="onPickImage('template', $any($event.target).files?.item(0) ?? null)"
+          />
+          <button class="btn btn--secondary" (click)="templateFile.click()" [disabled]="isLoading()">
+            Choose file…
           </button>
-          <span class="status" *ngIf="templatePath()">{{ templatePath() }}</span>
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              [checked]="templateDefaultEnabled()"
+              (change)="setDefaultAsset('template', $any($event.target).checked)"
+              [disabled]="isLoading()"
+            />
+            Set as default
+          </label>
+        </div>
+        <div class="filePath" *ngIf="templatePath()">
+          Default: <span class="mono">{{ templatePath() }}</span>
         </div>
       </div>
 
       <div class="field">
         <label class="label">Signature image (optional)</label>
-        <input
-          type="file"
-          accept="image/*"
-          (change)="onPickImage('signature', $any($event.target).files?.item(0) ?? null)"
-        />
-        <div class="row">
-          <button class="btn btn--secondary" (click)="chooseDefaultAsset('signature')" [disabled]="isLoading()">
-            Choose default…
+        <div class="fileRow">
+          <input
+            #signatureFile
+            class="fileInput"
+            type="file"
+            accept="image/*"
+            (change)="onPickImage('signature', $any($event.target).files?.item(0) ?? null)"
+          />
+          <button class="btn btn--secondary" (click)="signatureFile.click()" [disabled]="isLoading()">
+            Choose file…
           </button>
-          <span class="status" *ngIf="signaturePath()">{{ signaturePath() }}</span>
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              [checked]="signatureDefaultEnabled()"
+              (change)="setDefaultAsset('signature', $any($event.target).checked)"
+              [disabled]="isLoading()"
+            />
+            Set as default
+          </label>
+        </div>
+        <div class="filePath" *ngIf="signaturePath()">
+          Default: <span class="mono">{{ signaturePath() }}</span>
         </div>
       </div>
 

@@ -77,6 +77,8 @@ export class App {
   protected readonly signatureBase64 = signal<string | null>(null);
   protected readonly templatePath = signal<string | null>(null);
   protected readonly signaturePath = signal<string | null>(null);
+  protected readonly templateDefaultEnabled = signal(false);
+  protected readonly signatureDefaultEnabled = signal(false);
 
   protected readonly previewPngBase64 = signal<string | null>(null);
   protected readonly warning = signal<string | null>(null);
@@ -145,6 +147,8 @@ export class App {
 
       this.templatePath.set(tplPath || null);
       this.signaturePath.set(sigPath || null);
+      this.templateDefaultEnabled.set(!!tplPath);
+      this.signatureDefaultEnabled.set(!!sigPath);
       if (tplB64) this.templateBase64.set(tplB64);
       if (sigB64) this.signatureBase64.set(sigB64);
 
@@ -232,9 +236,11 @@ export class App {
       if (kind === 'template') {
         this.templatePath.set(path);
         this.templateBase64.set(b64);
+        this.templateDefaultEnabled.set(true);
       } else {
         this.signaturePath.set(path);
         this.signatureBase64.set(b64);
+        this.signatureDefaultEnabled.set(true);
       }
 
       await firstValueFrom(
@@ -247,6 +253,43 @@ export class App {
       this.schedulePreview();
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to choose default asset.';
+      this.error.set(String(msg));
+    }
+  }
+
+  protected async setDefaultAsset(kind: 'template' | 'signature', enabled: boolean): Promise<void> {
+    if (enabled) {
+      const before =
+        kind === 'template' ? this.templatePath() : this.signaturePath();
+      await this.chooseDefaultAsset(kind);
+      const after =
+        kind === 'template' ? this.templatePath() : this.signaturePath();
+      const ok = !!after && after !== before;
+      if (!ok) {
+        if (kind === 'template') this.templateDefaultEnabled.set(!!before);
+        else this.signatureDefaultEnabled.set(!!before);
+      }
+      return;
+    }
+
+    // Disable default (but keep currently-loaded in-memory base64 if present)
+    if (kind === 'template') {
+      this.templatePath.set(null);
+      this.templateDefaultEnabled.set(false);
+    } else {
+      this.signaturePath.set(null);
+      this.signatureDefaultEnabled.set(false);
+    }
+
+    try {
+      await firstValueFrom(
+        this.http.put(`${this.apiBase}/settings/assets`, {
+          template_path: this.templatePath(),
+          signature_path: this.signaturePath(),
+        })
+      );
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to save default setting.';
       this.error.set(String(msg));
     }
   }
