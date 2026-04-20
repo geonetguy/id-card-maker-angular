@@ -164,11 +164,11 @@
         </div>
 
         <div class="actions">
-          <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || members().length === 0">
-            Email batch
+          <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedCount() === 0">
+            Email card(s)
           </button>
-          <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || members().length === 0">
-            Generate batch
+          <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || selectedCount() === 0">
+            Generate card(s)
           </button>
         </div>
 
@@ -195,6 +195,16 @@
           <table class="table">
             <thead>
               <tr>
+                <th class="colSelect">
+                  <label class="checkbox checkbox--table">
+                    <input
+                      type="checkbox"
+                      [checked]="selectAll()"
+                      [disabled]="members().length === 0"
+                      (change)="toggleSelectAll($any($event.target).checked)"
+                    />
+                  </label>
+                </th>
                 <th>Name</th>
                 <th>ID Number</th>
                 <th>Date</th>
@@ -209,10 +219,21 @@
                     [class.tableRow--selected]="selectedIndex() === $index"
                     (click)="selectRow($index)"
                   >
+                    <td class="colSelect" (click)="$event.stopPropagation()">
+                      <label class="checkbox checkbox--table">
+                        <input
+                          type="checkbox"
+                          [checked]="m.selected"
+                          (click)="$event.stopPropagation()"
+                          (change)="toggleRowSelected($index, $any($event.target).checked)"
+                        />
+                      </label>
+                    </td>
                     <td>
                       <input
                         class="tableCellInput"
                         [value]="m.name"
+                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'name', $any($event.target).value)"
                       />
                     </td>
@@ -220,6 +241,7 @@
                       <input
                         class="tableCellInput"
                         [value]="m.id_number"
+                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'id_number', $any($event.target).value)"
                       />
                     </td>
@@ -228,6 +250,7 @@
                         class="tableCellInput"
                         placeholder="YYYY-MM-DD"
                         [value]="m.date"
+                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'date', $any($event.target).value)"
                       />
                     </td>
@@ -235,6 +258,7 @@
                       <input
                         class="tableCellInput"
                         [value]="m.email"
+                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'email', $any($event.target).value)"
                       />
                     </td>
@@ -242,6 +266,7 @@
                 }
               } @else {
                 <tr class="tableRow tableRow--placeholder">
+                  <td class="colSelect"><input type="checkbox" disabled /></td>
                   <td><input class="tableCellInput" disabled value="" /></td>
                   <td><input class="tableCellInput" disabled value="" /></td>
                   <td><input class="tableCellInput" disabled value="" /></td>

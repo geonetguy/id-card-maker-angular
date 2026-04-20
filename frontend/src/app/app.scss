@@ -154,6 +154,10 @@
   color: var(--uip-text-muted);
 }
 
+.checkbox--table {
+  gap: 0;
+}
+
 .textarea {
   width: 100%;
   box-sizing: border-box;
@@ -376,6 +380,12 @@
 
 .table th {
   padding: 10px 10px;
+}
+
+.colSelect {
+  width: 42px;
+  padding: 10px 10px !important;
+  text-align: center;
 }
 
 .tableCellInput {

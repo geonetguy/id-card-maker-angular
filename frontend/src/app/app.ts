@@ -10,6 +10,8 @@ type Member = {
   email: string;
 };
 
+type MemberRow = Member & { selected: boolean };
+
 type GenerateBatchResult = { index: number; result: 'ok' | 'skip' | 'error' };
 type GenerateBatchOut = {
   total: number;
@@ -85,8 +87,9 @@ export class App {
   protected readonly error = signal<string | null>(null);
   protected readonly isLoading = signal(false);
 
-  protected readonly members = signal<Member[]>([]);
+  protected readonly members = signal<MemberRow[]>([]);
   protected readonly selectedIndex = signal<number | null>(null);
+  protected readonly selectAll = signal(false);
 
   protected readonly batchStatus = signal<string | null>(null);
   protected readonly batchResult = signal<GenerateBatchOut | null>(null);
@@ -130,6 +133,18 @@ export class App {
       this.date().trim().length > 0 &&
       this.email().trim().length > 0
     );
+  });
+
+  protected readonly selectedCount = computed(() => {
+    const rows = this.members();
+    if (this.selectAll()) return rows.length;
+    return rows.reduce((acc, r) => acc + (r.selected ? 1 : 0), 0);
+  });
+
+  protected readonly selectedMembers = computed<Member[]>(() => {
+    const rows = this.members();
+    const chosen = this.selectAll() ? rows : rows.filter((r) => r.selected);
+    return chosen.map(({ name, id_number, date, email }) => ({ name, id_number, date, email }));
   });
 
   protected readonly hasActiveEmailCreds = computed(() => {
@@ -338,12 +353,17 @@ export class App {
       const form = new FormData();
       form.append('file', file, file.name);
 
-      const resp = await firstValueFrom(
-        this.http.post<{ members: Member[] }>(`${this.apiBase}/upload-csv`, form)
-      );
+      const resp = await firstValueFrom(this.http.post<{ members: Member[] }>(`${this.apiBase}/upload-csv`, form));
 
       const incoming = Array.isArray(resp.members) ? resp.members : [];
-      const merged = [...this.members(), ...incoming];
+      const incomingRows: MemberRow[] = incoming.map((m) => ({
+        name: m.name ?? '',
+        id_number: m.id_number ?? '',
+        date: m.date ?? '',
+        email: m.email ?? '',
+        selected: this.selectAll(),
+      }));
+      const merged = [...this.members(), ...incomingRows];
       this.members.set(merged);
       this.batchStatus.set(`Loaded ${incoming.length} member(s) from ${file.name}.`);
     } catch (e: any) {
@@ -366,10 +386,29 @@ export class App {
 
   protected addMemberRow(): void {
     const rows = this.members();
-    const next: Member = { name: '', id_number: '', date: '', email: '' };
+    const next: MemberRow = { name: '', id_number: '', date: '', email: '', selected: true };
     const updated = [...rows, next];
     this.members.set(updated);
     this.selectRow(updated.length - 1);
+  }
+
+  protected toggleSelectAll(enabled: boolean): void {
+    this.selectAll.set(!!enabled);
+    const rows = this.members();
+    if (!rows.length) return;
+    const next = rows.map((r) => ({ ...r, selected: !!enabled }));
+    this.members.set(next);
+  }
+
+  protected toggleRowSelected(index: number, enabled: boolean): void {
+    const rows = this.members();
+    if (index < 0 || index >= rows.length) return;
+    const next = rows.slice();
+    next[index] = { ...next[index], selected: !!enabled };
+    this.members.set(next);
+
+    // If any row is deselected, Select All becomes false.
+    if (!enabled && this.selectAll()) this.selectAll.set(false);
   }
 
   protected updateRowField(index: number, field: keyof Member, value: string): void {
@@ -401,11 +440,12 @@ export class App {
   }
 
   protected saveMember(): void {
-    const member: Member = {
+    const member: MemberRow = {
       name: this.name().trim(),
       id_number: this.idNumber().trim(),
       date: this.date().trim(),
       email: this.email().trim(),
+      selected: true,
     };
 
     const idx = this.selectedIndex();
@@ -415,7 +455,7 @@ export class App {
       this.batchStatus.set('Added member to table.');
     } else {
       const next = rows.slice();
-      next[idx] = member;
+      next[idx] = { ...member, selected: rows[idx]?.selected ?? true };
       this.members.set(next);
       this.batchStatus.set('Updated member in table.');
     }
@@ -432,17 +472,17 @@ export class App {
       return;
     }
 
-    const rows = this.members();
-    if (!rows.length) {
-      this.error.set('No members loaded yet.');
+    const chosen = this.selectedMembers();
+    if (!chosen.length) {
+      this.error.set('No members selected.');
       return;
     }
 
     this.isLoading.set(true);
-    this.batchStatus.set(`Generating ${rows.length} card(s)...`);
+    this.batchStatus.set(`Generating ${chosen.length} card(s)...`);
     try {
       const payload = {
-        members: rows,
+        members: chosen,
         template_base64: template,
         signature_base64: this.signatureBase64(),
         output_dir: this.outputDir().trim() || null,
@@ -657,9 +697,9 @@ export class App {
     this.emailStatus.set(null);
     this.emailResult.set(null);
 
-    const rows = this.members();
-    if (!rows.length) {
-      this.error.set('No members loaded yet.');
+    const chosen = this.selectedMembers();
+    if (!chosen.length) {
+      this.error.set('No members selected.');
       return;
     }
 
@@ -684,11 +724,11 @@ export class App {
 
     this.isEmailing.set(true);
     this.isLoading.set(true);
-    this.emailStatus.set(`Sending ${rows.length} email(s)...`);
+    this.emailStatus.set(`Sending ${chosen.length} email(s)...`);
 
     try {
       const payload = {
-        members: rows,
+        members: chosen,
         smtp: {
           host: d.smtp_server,
           port: d.smtp_port,
