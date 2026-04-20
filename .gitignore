@@ -19,6 +19,9 @@ dist/
 .eggs/
 pip-wheel-metadata/
 
+# Python package metadata
+*.dist-info/
+
 # =========================
 # Build artifacts
 # =========================
