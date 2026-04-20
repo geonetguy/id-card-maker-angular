@@ -16,7 +16,9 @@ from __future__ import annotations
 import csv
 import base64
 import io
+import os
 from pathlib import Path
+from typing import Callable
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -49,6 +51,26 @@ app.add_middleware(
 _DEFAULT_FONT_PATH: Optional[Path] = Path(__file__).resolve().parent / "resources" / "courbd.ttf"
 if not _DEFAULT_FONT_PATH.exists():
     _DEFAULT_FONT_PATH = None
+
+_choose_output_dir_callback: Optional[Callable[[Optional[str]], Optional[str]]] = None
+
+
+def set_choose_output_dir_callback(cb: Callable[[Optional[str]], Optional[str]]) -> None:
+    """
+    Injected by the Toga shell at runtime.
+
+    The callback is expected to display a native folder picker and return a
+    filesystem path (string), or None if the user cancels.
+    """
+    global _choose_output_dir_callback
+    _choose_output_dir_callback = cb
+
+
+def _default_output_dir() -> Path:
+    override = (os.environ.get("IDCARD_OUTPUT_DIR") or "").strip()
+    if override:
+        return Path(override).expanduser()
+    return project_output_dir()
 
 
 class MemberIn(BaseModel):
@@ -118,6 +140,18 @@ class UploadCsvOut(BaseModel):
     members: list[MemberLooseIn]
 
 
+class ConfigOut(BaseModel):
+    output_dir: Optional[str] = None
+
+
+class ChooseOutputDirIn(BaseModel):
+    initial_dir: Optional[str] = None
+
+
+class ChooseOutputDirOut(BaseModel):
+    output_dir: Optional[str] = None
+
+
 class SMTPConfigIn(BaseModel):
     host: str = ""
     port: int = 587
@@ -156,6 +190,24 @@ class EmailOut(BaseModel):
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/config", response_model=ConfigOut)
+def config() -> ConfigOut:
+    override = (os.environ.get("IDCARD_OUTPUT_DIR") or "").strip()
+    return ConfigOut(output_dir=(override or None))
+
+
+@app.post("/choose-output-dir", response_model=ChooseOutputDirOut)
+def choose_output_dir(body: ChooseOutputDirIn) -> ChooseOutputDirOut:
+    if _choose_output_dir_callback is None:
+        raise HTTPException(status_code=501, detail="folder_picker_not_available")
+
+    try:
+        chosen = _choose_output_dir_callback((body.initial_dir or "").strip() or None)
+        return ChooseOutputDirOut(output_dir=chosen)
+    except Exception:
+        raise HTTPException(status_code=500, detail="internal_error")
 
 
 @app.post("/preview", response_model=PreviewOut)
@@ -207,7 +259,7 @@ def generate(body: GenerateIn) -> GenerateOut:
             font_path=_DEFAULT_FONT_PATH,
         )
 
-        out_dir = Path(body.output_dir).expanduser() if body.output_dir else project_output_dir()
+        out_dir = Path(body.output_dir).expanduser() if body.output_dir else _default_output_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{safe_filename(idnum)}.png"
         out_path: Path = next_available(out_dir / filename)
@@ -237,7 +289,7 @@ async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
         if body.signature_base64:
             signature = _pil_image_from_base64(body.signature_base64).convert("RGBA")
 
-        out_dir = Path(body.output_dir).expanduser() if body.output_dir else project_output_dir()
+        out_dir = Path(body.output_dir).expanduser() if body.output_dir else _default_output_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
 
         rows: list[dict[str, str]] = []

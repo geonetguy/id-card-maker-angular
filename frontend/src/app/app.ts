@@ -20,6 +20,9 @@ type GenerateBatchOut = {
   results: GenerateBatchResult[];
 };
 
+type ConfigOut = { output_dir?: string | null };
+type ChooseOutputDirOut = { output_dir?: string | null };
+
 @Component({
   selector: 'app-root',
   imports: [NgIf],
@@ -34,6 +37,7 @@ export class App {
   protected readonly date = signal('');
   protected readonly email = signal('');
   protected readonly outputDir = signal('');
+  protected readonly isChoosingOutputDir = signal(false);
 
   protected readonly templateBase64 = signal<string | null>(null);
   protected readonly signatureBase64 = signal<string | null>(null);
@@ -53,6 +57,16 @@ export class App {
 
   constructor(private readonly http: HttpClient) {}
 
+  async ngOnInit(): Promise<void> {
+    try {
+      const cfg = await firstValueFrom(this.http.get<ConfigOut>(`${this.apiBase}/config`));
+      const v = (cfg?.output_dir ?? '').toString().trim();
+      if (v) this.outputDir.set(v);
+    } catch {
+      // ignore; API may not be up yet
+    }
+  }
+
   protected onTextChange(kind: 'name' | 'id' | 'date' | 'email', value: string): void {
     const v = value ?? '';
     if (kind === 'name') this.name.set(v);
@@ -64,6 +78,26 @@ export class App {
 
   protected onOutputDirChange(value: string): void {
     this.outputDir.set(value ?? '');
+  }
+
+  protected async chooseOutputDir(): Promise<void> {
+    this.error.set(null);
+    this.isChoosingOutputDir.set(true);
+    try {
+      const payload = { initial_dir: this.outputDir().trim() || null };
+      const resp = await firstValueFrom(
+        this.http.post<ChooseOutputDirOut>(`${this.apiBase}/choose-output-dir`, payload)
+      );
+      const chosen = (resp?.output_dir ?? '').toString().trim();
+      if (chosen) {
+        this.outputDir.set(chosen);
+      }
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to choose output folder.';
+      this.error.set(String(msg));
+    } finally {
+      this.isChoosingOutputDir.set(false);
+    }
   }
 
   protected async onPickImage(kind: 'template' | 'signature', file: File | null): Promise<void> {

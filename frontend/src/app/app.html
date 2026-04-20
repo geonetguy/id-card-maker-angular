@@ -61,12 +61,17 @@
 
       <div class="field">
         <label class="label">Output folder (optional)</label>
-        <input
-          class="input"
-          placeholder="e.g. C:\\Users\\you\\Documents\\ID Cards"
-          [value]="outputDir()"
-          (input)="onOutputDirChange($any($event.target).value)"
-        />
+        <div class="row">
+          <input
+            class="input"
+            placeholder="e.g. C:\\Users\\you\\Documents\\ID Cards"
+            [value]="outputDir()"
+            (input)="onOutputDirChange($any($event.target).value)"
+          />
+          <button class="btn btn--secondary" (click)="chooseOutputDir()" [disabled]="isLoading() || isChoosingOutputDir()">
+            Choose…
+          </button>
+        </div>
       </div>
 
       <div class="actions">

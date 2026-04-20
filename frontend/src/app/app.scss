@@ -54,6 +54,16 @@
   margin-bottom: 10px;
 }
 
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.row .input {
+  flex: 1;
+}
+
 .label {
   font-size: 12px;
   color: rgba(232, 238, 252, 0.70);

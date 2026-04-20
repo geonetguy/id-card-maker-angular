@@ -30,6 +30,12 @@ def test_health(client: TestClient) -> None:
     assert r.json() == {"status": "ok"}
 
 
+def test_config_exists(client: TestClient) -> None:
+    r = client.get("/config")
+    assert r.status_code == 200
+    assert "output_dir" in r.json()
+
+
 def test_preview_returns_png_base64(client: TestClient) -> None:
     r = client.post(
         "/preview",

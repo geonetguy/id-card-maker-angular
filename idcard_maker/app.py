@@ -1,12 +1,15 @@
 # idcard_maker/app.py
 from __future__ import annotations
 
+import asyncio
 import os
 import socket
 import threading
 import time
 import tempfile
 import webbrowser
+import queue
+from concurrent.futures import Future
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from functools import partial
@@ -14,6 +17,7 @@ from functools import partial
 import toga
 
 from .api_app import app as api_app
+from .api_app import set_choose_output_dir_callback
 from .constants import APP_TITLE
 from .core.resources import resource_path
 
@@ -24,6 +28,9 @@ class IDCardApp(toga.App):
         self._static_httpd: ThreadingHTTPServer | None = None
         self._static_thread: threading.Thread | None = None
         self._static_port: int | None = None
+
+        self._output_dir: Path | None = None
+        self._output_dir_requests: "queue.Queue[tuple[Future[str | None], str | None]]" = queue.Queue()
 
     def _is_port_open(self, host: str, port: int, timeout_s: float = 0.15) -> bool:
         try:
@@ -112,6 +119,59 @@ class IDCardApp(toga.App):
             if self._is_port_open(host, port):
                 break
             time.sleep(0.05)
+
+    def _choose_output_dir_blocking(self, initial_dir: str | None) -> str | None:
+        """
+        Called by FastAPI request handlers (background thread).
+        Enqueue a UI request and block until the user chooses/cancels.
+        """
+        fut: Future[str | None] = Future()
+        self._output_dir_requests.put((fut, initial_dir))
+        try:
+            return fut.result(timeout=300)
+        except Exception:
+            return None
+
+    async def _run_folder_picker(self, fut: Future[str | None], initial_dir: str | None) -> None:
+        try:
+            initial: Path | str | None = self._output_dir or None
+            if initial is None and initial_dir:
+                initial = initial_dir
+            dialog = toga.SelectFolderDialog(
+                title="Choose output folder",
+                initial_directory=initial,
+                multiple_select=False,
+            )
+            result = await self.main_window.dialog(dialog)
+            chosen: Path | None
+            if isinstance(result, list):
+                chosen = result[0] if result else None
+            else:
+                chosen = result
+
+            if chosen is None:
+                fut.set_result(None)
+                return
+
+            self._output_dir = Path(chosen)
+            os.environ["IDCARD_OUTPUT_DIR"] = str(self._output_dir)
+            fut.set_result(str(self._output_dir))
+        except Exception:
+            try:
+                fut.set_result(None)
+            except Exception:
+                pass
+
+    async def on_running(self) -> None:
+        # Process folder-picking requests coming from the API thread.
+        while True:
+            try:
+                fut, initial_dir = self._output_dir_requests.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.1)
+                continue
+
+            await self._run_folder_picker(fut, initial_dir)
 
     def _find_free_port(self, host: str = "127.0.0.1") -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -216,6 +276,9 @@ class IDCardApp(toga.App):
             title=APP_TITLE,
             resizable=True,
         )
+
+        # Allow the Angular UI to open a native folder picker via the API.
+        set_choose_output_dir_callback(self._choose_output_dir_blocking)
 
         # Start backend API in-process (no business logic duplication in Angular).
         self._start_api_server()
