@@ -85,36 +85,6 @@
         </div>
       </div>
 
-      <div class="sectionHeader">
-        <h2>Member</h2>
-        <button class="btn btn--secondary" (click)="newMember()" [disabled]="isLoading()">New</button>
-      </div>
-
-      <div class="field">
-        <label class="label">Name</label>
-        <input class="input" [value]="name()" (input)="onTextChange('name', $any($event.target).value)" />
-      </div>
-
-      <div class="field">
-        <label class="label">ID Number</label>
-        <input class="input" [value]="idNumber()" (input)="onTextChange('id', $any($event.target).value)" />
-      </div>
-
-      <div class="field">
-        <label class="label">Date</label>
-        <input
-          class="input"
-          placeholder="YYYY-MM-DD"
-          [value]="date()"
-          (input)="onTextChange('date', $any($event.target).value)"
-        />
-      </div>
-
-      <div class="field">
-        <label class="label">Email</label>
-        <input class="input" [value]="email()" (input)="onTextChange('email', $any($event.target).value)" />
-      </div>
-
       <div class="field">
         <label class="label">Output folder (optional)</label>
         <div class="row">
@@ -128,29 +98,6 @@
             Choose…
           </button>
         </div>
-      </div>
-
-      <div class="actions">
-        <!-- Preview refresh is automatic on changes -->
-        <button class="btn" (click)="generateOne()" [disabled]="isLoading() || !assetsReady() || !memberComplete()">
-          Generate card
-        </button>
-        <button
-          class="btn btn--secondary"
-          (click)="sendEmailOne()"
-          [disabled]="isLoading() || isEmailing() || !assetsReady() || !idNumber().trim() || !email().trim()"
-        >
-          Email card
-        </button>
-        <button class="btn btn--secondary" (click)="saveMember()" [disabled]="isLoading() || !memberComplete()">Save member</button>
-        <span class="status" *ngIf="isLoading()">Rendering…</span>
-      </div>
-
-      <div class="actions" *ngIf="generateStatus() || lastGenerated()">
-        <button class="btn btn--secondary" (click)="downloadLast()" [disabled]="isLoading() || !lastGenerated()">Download PNG</button>
-        <button class="btn btn--secondary" (click)="openGenerated('file')" [disabled]="isLoading() || !lastGenerated()">Open file</button>
-        <button class="btn btn--secondary" (click)="openGenerated('folder')" [disabled]="isLoading() || !lastGenerated()">Open folder</button>
-        <span class="status" *ngIf="generateStatus()">{{ generateStatus() }}</span>
       </div>
 
       <div class="callouts" *ngIf="error() || warning()">
@@ -180,6 +127,31 @@
         <ng-template #noPreview>
           <div class="empty">Choose a template to render a preview.</div>
         </ng-template>
+
+        <div class="actions">
+          <button
+            class="btn"
+            (click)="generateOne()"
+            [disabled]="isLoading() || !assetsReady() || selectedIndex() === null || !memberComplete()"
+          >
+            Generate card
+          </button>
+          <button
+            class="btn btn--secondary"
+            (click)="sendEmailOne()"
+            [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedIndex() === null || !idNumber().trim() || !email().trim()"
+          >
+            Email card
+          </button>
+          <span class="status" *ngIf="isLoading()">Rendering…</span>
+        </div>
+
+        <div class="actions" *ngIf="generateStatus() || lastGenerated()">
+          <button class="btn btn--secondary" (click)="downloadLast()" [disabled]="isLoading() || !lastGenerated()">Download PNG</button>
+          <button class="btn btn--secondary" (click)="openGenerated('file')" [disabled]="isLoading() || !lastGenerated()">Open file</button>
+          <button class="btn btn--secondary" (click)="openGenerated('folder')" [disabled]="isLoading() || !lastGenerated()">Open folder</button>
+          <span class="status" *ngIf="generateStatus()">{{ generateStatus() }}</span>
+        </div>
       </section>
 
       <section class="panel panel--table">
