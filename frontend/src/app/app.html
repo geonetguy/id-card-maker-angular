@@ -135,10 +135,10 @@
         <div class="tableToolbar">
           <div class="actions">
             <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">Add member</button>
-            <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0">Export CSV</button>
-            <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()">Open folder</button>
             <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || selectedCount() === 0">Generate card(s)</button>
             <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedCount() === 0">Email card(s)</button>
+            <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()">Open folder</button>
+            <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0">Export CSV</button>
           </div>
 
           <div class="statusStack" *ngIf="emailStatus() || batchStatus()">
