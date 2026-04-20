@@ -121,7 +121,16 @@ export class App {
 
   protected readonly hasTemplate = computed(() => !!this.templateBase64());
   protected readonly hasSignature = computed(() => !!this.signatureBase64());
-  protected readonly assetsReady = computed(() => this.hasTemplate() && this.hasSignature());
+  protected readonly assetsReady = computed(() => this.hasTemplate());
+
+  protected readonly memberComplete = computed(() => {
+    return (
+      this.name().trim().length > 0 &&
+      this.idNumber().trim().length > 0 &&
+      this.date().trim().length > 0 &&
+      this.email().trim().length > 0
+    );
+  });
 
   protected readonly hasActiveEmailCreds = computed(() => {
     const emailAddr = this.currentEmail().trim();
