@@ -157,7 +157,14 @@
       <div class="field">
         <label class="label">Body template</label>
         <textarea class="textarea" rows="8" [value]="emailBodyTpl()" (input)="emailBodyTpl.set($any($event.target).value); onEmailTplChange()"></textarea>
-        <div class="hint">Available: {'{name}'}, {'{id_number}'}, {'{date}'}, {'{email}'}, {'{sender}'}</div>
+        <div class="hint">
+          Available:
+          <code>{{ '{' }}name{{ '}' }}</code>,
+          <code>{{ '{' }}id_number{{ '}' }}</code>,
+          <code>{{ '{' }}date{{ '}' }}</code>,
+          <code>{{ '{' }}email{{ '}' }}</code>,
+          <code>{{ '{' }}sender{{ '}' }}</code>
+        </div>
       </div>
 
       <div class="actions">
@@ -170,7 +177,7 @@
       <div class="batchSummary" *ngIf="emailResult()">
         <div class="batchSummary__title">Last email</div>
         <div class="batchSummary__line">
-          Total: {{ emailResult()!.total }} · Sent: {{ emailResult()!.sent }} · Skipped: {{ emailResult()!.skipped }} · Errors: {{ emailResult()!.errors }}
+          Total: {{ emailResult()!.total }} &middot; Sent: {{ emailResult()!.sent }} &middot; Skipped: {{ emailResult()!.skipped }} &middot; Errors: {{ emailResult()!.errors }}
         </div>
       </div>
 
