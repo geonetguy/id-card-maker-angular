@@ -85,6 +85,7 @@ class GenerateIn(BaseModel):
     member: MemberIn
     template_base64: str = Field(..., min_length=1)
     signature_base64: Optional[str] = None
+    output_dir: Optional[str] = None
 
 
 class GenerateOut(BaseModel):
@@ -96,6 +97,7 @@ class GenerateBatchIn(BaseModel):
     members: list[MemberLooseIn] = Field(default_factory=list)
     template_base64: str = Field(..., min_length=1)
     signature_base64: Optional[str] = None
+    output_dir: Optional[str] = None
 
 
 class GenerateBatchResult(BaseModel):
@@ -108,6 +110,7 @@ class GenerateBatchOut(BaseModel):
     ok: int
     skipped: int
     errors: int
+    output_dir: str
     results: list[GenerateBatchResult]
 
 
@@ -204,7 +207,7 @@ def generate(body: GenerateIn) -> GenerateOut:
             font_path=_DEFAULT_FONT_PATH,
         )
 
-        out_dir = project_output_dir()
+        out_dir = Path(body.output_dir).expanduser() if body.output_dir else project_output_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{safe_filename(idnum)}.png"
         out_path: Path = next_available(out_dir / filename)
@@ -234,7 +237,7 @@ async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
         if body.signature_base64:
             signature = _pil_image_from_base64(body.signature_base64).convert("RGBA")
 
-        out_dir = project_output_dir()
+        out_dir = Path(body.output_dir).expanduser() if body.output_dir else project_output_dir()
         out_dir.mkdir(parents=True, exist_ok=True)
 
         rows: list[dict[str, str]] = []
@@ -259,7 +262,14 @@ async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
                 errors += 1
             results.append(GenerateBatchResult(index=idx, result=result))
 
-        return GenerateBatchOut(total=len(rows), ok=ok, skipped=skipped, errors=errors, results=results)
+        return GenerateBatchOut(
+            total=len(rows),
+            ok=ok,
+            skipped=skipped,
+            errors=errors,
+            output_dir=str(out_dir),
+            results=results,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

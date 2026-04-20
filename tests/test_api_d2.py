@@ -88,6 +88,9 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
         assert payload["ok"] == 1
         assert payload["skipped"] == 1
         assert payload["errors"] == 0
+        assert "output_dir" in payload
+        assert isinstance(payload["output_dir"], str)
+        assert payload["output_dir"]
 
         after = {p.name for p in out_dir.glob("*.png")}
         created = sorted(after - before)
@@ -111,4 +114,3 @@ def test_email_requires_smtp_fields(client: TestClient) -> None:
         },
     )
     assert r.status_code == 400
-

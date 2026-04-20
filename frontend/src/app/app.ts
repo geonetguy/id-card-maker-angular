@@ -16,6 +16,7 @@ type GenerateBatchOut = {
   ok: number;
   skipped: number;
   errors: number;
+  output_dir?: string;
   results: GenerateBatchResult[];
 };
 
@@ -32,6 +33,7 @@ export class App {
   protected readonly idNumber = signal('');
   protected readonly date = signal('');
   protected readonly email = signal('');
+  protected readonly outputDir = signal('');
 
   protected readonly templateBase64 = signal<string | null>(null);
   protected readonly signatureBase64 = signal<string | null>(null);
@@ -58,6 +60,10 @@ export class App {
     if (kind === 'date') this.date.set(v);
     if (kind === 'email') this.email.set(v);
     this.schedulePreview();
+  }
+
+  protected onOutputDirChange(value: string): void {
+    this.outputDir.set(value ?? '');
   }
 
   protected async onPickImage(kind: 'template' | 'signature', file: File | null): Promise<void> {
@@ -142,6 +148,7 @@ export class App {
   protected async generateBatch(): Promise<void> {
     this.error.set(null);
     this.batchResult.set(null);
+    this.batchStatus.set(null);
 
     const template = this.templateBase64();
     if (!template) {
@@ -156,25 +163,27 @@ export class App {
     }
 
     this.isLoading.set(true);
-    this.batchStatus.set(`Generating ${rows.length} card(s)…`);
+    this.batchStatus.set(`Generating ${rows.length} card(s)...`);
     try {
       const payload = {
         members: rows,
         template_base64: template,
         signature_base64: this.signatureBase64(),
+        output_dir: this.outputDir().trim() || null,
       };
 
       const resp = await firstValueFrom(
         this.http.post<GenerateBatchOut>(`${this.apiBase}/generate-batch`, payload)
       );
       this.batchResult.set(resp);
+      const outDir = resp.output_dir ? ` Saved to: ${resp.output_dir}` : '';
       this.batchStatus.set(
-        `Batch complete: ${resp.ok} saved, ${resp.skipped} skipped, ${resp.errors} errors.`
+        `Batch complete: ${resp.ok} saved, ${resp.skipped} skipped, ${resp.errors} errors.${outDir}`
       );
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to generate batch.';
       this.error.set(String(msg));
-      this.batchStatus.set(null);
+      this.batchStatus.set(String(msg));
     } finally {
       this.isLoading.set(false);
     }
@@ -201,6 +210,7 @@ export class App {
         },
         template_base64: template,
         signature_base64: this.signatureBase64(),
+        output_dir: this.outputDir().trim() || null,
       };
 
       const resp = await firstValueFrom(
