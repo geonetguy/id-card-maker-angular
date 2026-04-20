@@ -69,6 +69,32 @@
   color: rgba(232, 238, 252, 0.70);
 }
 
+.checkbox {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: rgba(232, 238, 252, 0.85);
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: rgba(232, 238, 252, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  resize: vertical;
+}
+
+.hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(232, 238, 252, 0.60);
+}
+
 .input {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);

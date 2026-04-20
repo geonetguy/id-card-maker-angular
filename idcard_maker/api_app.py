@@ -186,6 +186,7 @@ class EmailIn(BaseModel):
     # Optional: if attachment doesn't exist, API can generate it using these assets
     template_base64: Optional[str] = None
     signature_base64: Optional[str] = None
+    output_dir: Optional[str] = None
 
 
 class EmailResult(BaseModel):
@@ -487,6 +488,9 @@ async def email(body: EmailIn) -> EmailOut:
     if body.signature_base64:
         signature = _pil_image_from_base64(body.signature_base64).convert("RGBA")
 
+    out_dir = Path(body.output_dir).expanduser() if body.output_dir else _default_output_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     def render_tpl(tpl: str, m: MemberIn) -> str:
         safe = {
             "name": (m.name or "").strip(),
@@ -514,15 +518,13 @@ async def email(body: EmailIn) -> EmailOut:
                         results.append(EmailResult(index=i, result="skipped", message="missing id_number or email"))
                         continue
 
-                    attach = attachment_path_for_id(idnum)
+                    attach = attachment_path_for_id(idnum, out_dir=out_dir)
                     if not attach.exists():
                         # Best-effort: generate if assets provided
                         if template is None:
                             skipped += 1
                             results.append(EmailResult(index=i, result="skipped", message="missing attachment and no template provided"))
                             continue
-                        out_dir = project_output_dir()
-                        out_dir.mkdir(parents=True, exist_ok=True)
                         date_norm = _normalize_date(m.date or "")
                         canvas = generate_single_card(
                             name=(m.name or "").strip(),

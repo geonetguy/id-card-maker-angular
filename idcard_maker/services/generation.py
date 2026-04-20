@@ -81,7 +81,8 @@ async def generate_batch_cards(
 
 
 # idcard_maker/services/generation.py  (append)
-def attachment_path_for_id(id_number: str) -> Path:
-    """Return the expected PNG path for a given id_number in project output dir."""
+def attachment_path_for_id(id_number: str, out_dir: Optional[Path] = None) -> Path:
+    """Return the expected PNG path for a given id_number in the output directory."""
     # We only attach the exact "<id>.png" if it exists; we don't guess -1, -2 variants.
-    return project_output_dir() / f"{safe_filename(id_number)}.png"
+    base = out_dir or project_output_dir()
+    return base / f"{safe_filename(id_number)}.png"

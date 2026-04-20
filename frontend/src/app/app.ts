@@ -24,6 +24,8 @@ type GenerateOut = { filename: string; path: string; output_dir: string };
 type ConfigOut = { output_dir?: string | null };
 type ChooseOutputDirOut = { output_dir?: string | null };
 type OpenPathOut = { ok: boolean };
+type EmailResult = { index: number; result: 'sent' | 'skipped' | 'error'; message?: string | null };
+type EmailOut = { total: number; sent: number; skipped: number; errors: number; results: EmailResult[] };
 
 @Component({
   selector: 'app-root',
@@ -58,6 +60,22 @@ export class App {
   protected readonly generateStatus = signal<string | null>(null);
   protected readonly lastGenerated = signal<GenerateOut | null>(null);
 
+  protected readonly smtpHost = signal('');
+  protected readonly smtpPort = signal('587');
+  protected readonly smtpUseTls = signal(true);
+  protected readonly smtpUseSsl = signal(false);
+  protected readonly smtpUsername = signal('');
+  protected readonly smtpPassword = signal('');
+  protected readonly smtpFromName = signal('');
+  protected readonly smtpFromEmail = signal('');
+
+  protected readonly emailSubjectTpl = signal('Your ID card, {name}');
+  protected readonly emailBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
+
+  protected readonly emailStatus = signal<string | null>(null);
+  protected readonly emailResult = signal<EmailOut | null>(null);
+  protected readonly isEmailing = signal(false);
+
   private previewDebounceTimer: number | null = null;
 
   constructor(private readonly http: HttpClient) {}
@@ -69,6 +87,27 @@ export class App {
       if (v) this.outputDir.set(v);
     } catch {
       // ignore; API may not be up yet
+    }
+
+    try {
+      const raw = localStorage.getItem('idcard.smtp');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.host === 'string') this.smtpHost.set(s.host);
+        if (typeof s.port === 'string') this.smtpPort.set(s.port);
+        if (typeof s.useTls === 'boolean') this.smtpUseTls.set(s.useTls);
+        if (typeof s.useSsl === 'boolean') this.smtpUseSsl.set(s.useSsl);
+        if (typeof s.username === 'string') this.smtpUsername.set(s.username);
+        if (typeof s.password === 'string') this.smtpPassword.set(s.password);
+        if (typeof s.fromName === 'string') this.smtpFromName.set(s.fromName);
+        if (typeof s.fromEmail === 'string') this.smtpFromEmail.set(s.fromEmail);
+      }
+      const subj = localStorage.getItem('idcard.emailSubjectTpl');
+      const body = localStorage.getItem('idcard.emailBodyTpl');
+      if (subj) this.emailSubjectTpl.set(subj);
+      if (body) this.emailBodyTpl.set(body);
+    } catch {
+      // ignore
     }
   }
 
@@ -307,6 +346,99 @@ export class App {
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to open path.';
       this.error.set(String(msg));
+    }
+  }
+
+  protected onSmtpChange(): void {
+    try {
+      localStorage.setItem(
+        'idcard.smtp',
+        JSON.stringify({
+          host: this.smtpHost(),
+          port: this.smtpPort(),
+          useTls: this.smtpUseTls(),
+          useSsl: this.smtpUseSsl(),
+          username: this.smtpUsername(),
+          password: this.smtpPassword(),
+          fromName: this.smtpFromName(),
+          fromEmail: this.smtpFromEmail(),
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  protected onEmailTplChange(): void {
+    try {
+      localStorage.setItem('idcard.emailSubjectTpl', this.emailSubjectTpl());
+      localStorage.setItem('idcard.emailBodyTpl', this.emailBodyTpl());
+    } catch {
+      // ignore
+    }
+  }
+
+  protected async sendEmailBatch(): Promise<void> {
+    this.error.set(null);
+    this.emailStatus.set(null);
+    this.emailResult.set(null);
+
+    const rows = this.members();
+    if (!rows.length) {
+      this.error.set('No members loaded yet.');
+      return;
+    }
+
+    const host = this.smtpHost().trim();
+    const fromEmail = this.smtpFromEmail().trim();
+    if (!host || !fromEmail) {
+      this.error.set('SMTP host and From email are required.');
+      return;
+    }
+
+    const portNum = Number.parseInt(this.smtpPort().trim() || '587', 10);
+    if (!Number.isFinite(portNum) || portNum <= 0) {
+      this.error.set('SMTP port must be a number.');
+      return;
+    }
+
+    this.isEmailing.set(true);
+    this.isLoading.set(true);
+    this.emailStatus.set(`Sending ${rows.length} email(s)...`);
+
+    try {
+      const payload = {
+        members: rows,
+        smtp: {
+          host,
+          port: portNum,
+          use_tls: this.smtpUseTls(),
+          use_ssl: this.smtpUseSsl(),
+          username: this.smtpUsername(),
+          password: this.smtpPassword(),
+          from_name: this.smtpFromName(),
+          from_email: fromEmail,
+        },
+        subject_tpl: this.emailSubjectTpl(),
+        body_tpl: this.emailBodyTpl(),
+        template_base64: this.templateBase64(),
+        signature_base64: this.signatureBase64(),
+        output_dir: this.outputDir().trim() || null,
+      };
+
+      const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
+      this.emailResult.set(resp);
+      this.emailStatus.set(`Email complete: ${resp.sent} sent, ${resp.skipped} skipped, ${resp.errors} errors.`);
+
+      this.onSmtpChange();
+      this.onEmailTplChange();
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to send email.';
+      this.error.set(String(msg));
+      this.emailStatus.set(String(msg));
+    } finally {
+      this.isEmailing.set(false);
+      this.isLoading.set(false);
     }
   }
 

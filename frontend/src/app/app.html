@@ -103,6 +103,77 @@
         </div>
       </div>
 
+      <h2>Email</h2>
+
+      <div class="field">
+        <label class="label">SMTP host</label>
+        <input class="input" [value]="smtpHost()" (input)="smtpHost.set($any($event.target).value); onSmtpChange()" placeholder="smtp.example.com" />
+      </div>
+
+      <div class="field">
+        <label class="label">SMTP port</label>
+        <input class="input" [value]="smtpPort()" (input)="smtpPort.set($any($event.target).value); onSmtpChange()" placeholder="587" />
+      </div>
+
+      <div class="field">
+        <label class="label">Security</label>
+        <div class="row">
+          <label class="checkbox">
+            <input type="checkbox" [checked]="smtpUseTls()" (change)="smtpUseTls.set($any($event.target).checked); onSmtpChange()" />
+            TLS (STARTTLS)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" [checked]="smtpUseSsl()" (change)="smtpUseSsl.set($any($event.target).checked); onSmtpChange()" />
+            SSL
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Username</label>
+        <input class="input" [value]="smtpUsername()" (input)="smtpUsername.set($any($event.target).value); onSmtpChange()" />
+      </div>
+
+      <div class="field">
+        <label class="label">Password</label>
+        <input type="password" class="input" [value]="smtpPassword()" (input)="smtpPassword.set($any($event.target).value); onSmtpChange()" />
+      </div>
+
+      <div class="field">
+        <label class="label">From name</label>
+        <input class="input" [value]="smtpFromName()" (input)="smtpFromName.set($any($event.target).value); onSmtpChange()" />
+      </div>
+
+      <div class="field">
+        <label class="label">From email</label>
+        <input class="input" [value]="smtpFromEmail()" (input)="smtpFromEmail.set($any($event.target).value); onSmtpChange()" placeholder="you@example.com" />
+      </div>
+
+      <div class="field">
+        <label class="label">Subject template</label>
+        <input class="input" [value]="emailSubjectTpl()" (input)="emailSubjectTpl.set($any($event.target).value); onEmailTplChange()" />
+      </div>
+
+      <div class="field">
+        <label class="label">Body template</label>
+        <textarea class="textarea" rows="8" [value]="emailBodyTpl()" (input)="emailBodyTpl.set($any($event.target).value); onEmailTplChange()"></textarea>
+        <div class="hint">Available: {'{name}'}, {'{id_number}'}, {'{date}'}, {'{email}'}, {'{sender}'}</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || members().length === 0">
+          Email batch
+        </button>
+        <span class="status" *ngIf="emailStatus()">{{ emailStatus() }}</span>
+      </div>
+
+      <div class="batchSummary" *ngIf="emailResult()">
+        <div class="batchSummary__title">Last email</div>
+        <div class="batchSummary__line">
+          Total: {{ emailResult()!.total }} · Sent: {{ emailResult()!.sent }} · Skipped: {{ emailResult()!.skipped }} · Errors: {{ emailResult()!.errors }}
+        </div>
+      </div>
+
       <div class="actions">
         <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !templateBase64() || members().length === 0">
           Generate batch

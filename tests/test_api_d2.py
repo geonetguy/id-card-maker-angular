@@ -150,6 +150,7 @@ def test_email_requires_smtp_fields(client: TestClient) -> None:
         json={
             "members": [{"name": "Test", "id_number": "1", "date": "", "email": "x@example.com"}],
             "smtp": {"host": "", "port": 587, "use_tls": True, "use_ssl": False, "username": "", "password": "", "from_name": "", "from_email": ""},
+            "output_dir": str(project_output_dir()),
         },
     )
     assert r.status_code == 400
