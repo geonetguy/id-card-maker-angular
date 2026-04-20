@@ -7,6 +7,44 @@ license = "MIT"
 author = "Georg York"
 author_email = "h2onetguy@hotmail.com"
 
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idcard-maker"
+version = "1.0.0"
+description = "Generate, preview, and email ID cards from manual entries or CSV."
+requires-python = ">=3.11"
+dependencies = [
+    "toga>=0.5,<0.6",
+    "pillow>=10.0.0",
+    "python-barcode>=0.15.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["idcard_maker*"]
+
+[tool.setuptools.package-data]
+idcard_maker = ["resources/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+
 [tool.briefcase.app.idcard_maker]
 formal_name = "ID Card Maker"
 app_name = "idcard_maker"
@@ -17,7 +55,11 @@ sources = ["idcard_maker"]
 requires = [
     "toga>=0.5,<0.6",
     "pillow>=10.0.0",
-    "python-barcode>=0.15.0"
+    "python-barcode>=0.15.0",
+    # Backend API extraction (Angular migration)
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+    "python-multipart>=0.0.9"
 ]
 
 # Bundle all runtime assets (template.png, stripe.png, courbd.ttf, logo.png, help.html, etc.)

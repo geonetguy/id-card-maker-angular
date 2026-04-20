@@ -26,3 +26,33 @@ READY FOR API EXTRACTION
 
 ## NEXT STEP
 D2 – Backend API Layer
+
+---
+
+## STEP D2 – BACKEND API LAYER
+
+### Objective
+Expose existing Python functionality as HTTP APIs for the Angular UI without changing business logic.
+
+### Files Changed/Added
+- idcard_maker/api_preview.py
+- idcard_maker/api_app.py
+- tests/test_api_d2.py
+- pyproject.toml
+- .gitignore
+- LICENSE
+
+### Implemented Endpoints
+- GET /health
+- POST /preview
+- POST /generate
+- POST /generate-batch
+- POST /upload-csv
+- POST /email
+
+### Verification
+- py -3.13 -m briefcase dev -r (dependencies installed, app started)
+- py -3.13 -m pytest -q (5 passed)
+
+### Result
+D2 COMPLETE – API surface available for Angular integration (D3).

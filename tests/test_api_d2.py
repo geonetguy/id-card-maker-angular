@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+import base64
+import io
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
+
+from idcard_maker.api_app import app
+from idcard_maker.services.generation import project_output_dir
+
+
+@pytest.fixture()
+def client() -> TestClient:
+    return TestClient(app)
+
+
+def _png_b64(w: int = 507, h: int = 318) -> str:
+    img = Image.new("RGBA", (w, h), (255, 255, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def test_health(client: TestClient) -> None:
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+def test_preview_returns_png_base64(client: TestClient) -> None:
+    r = client.post(
+        "/preview",
+        json={
+            "member": {"name": "Test", "id_number": "123", "date": "2026-04-19", "email": "x@example.com"},
+            "template_base64": _png_b64(),
+            "signature_base64": None,
+        },
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert "png_base64" in data
+    assert isinstance(data["png_base64"], str)
+    assert len(data["png_base64"]) > 1000
+
+
+def test_upload_csv_parses_and_normalizes(client: TestClient) -> None:
+    csv_bytes = (
+        "Name,ID Number,Date,Email\n"
+        "Alice,1001,04/19/2026,alice@example.com\n"
+        "Bob,1002,not-a-date,bob@example.com\n"
+    ).encode("utf-8")
+
+    r = client.post(
+        "/upload-csv",
+        files={"file": ("members.csv", csv_bytes, "text/csv")},
+    )
+    assert r.status_code == 200
+    members = r.json()["members"]
+    assert members[0]["id_number"] == "1001"
+    assert members[0]["date"] == "2026-04-19"
+    assert members[1]["id_number"] == "1002"
+    assert members[1]["date"] == ""
+
+
+def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> None:
+    out_dir = project_output_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    before = {p.name for p in out_dir.glob("*.png")}
+    try:
+        r = client.post(
+            "/generate-batch",
+            json={
+                "members": [
+                    {"name": "Skip Me", "id_number": "", "date": "2026-04-19", "email": "s@example.com"},
+                    {"name": "Make Me", "id_number": "BATCH-1", "date": "2026-04-19", "email": "m@example.com"},
+                ],
+                "template_base64": _png_b64(),
+                "signature_base64": None,
+            },
+        )
+        assert r.status_code == 200
+        payload = r.json()
+        assert payload["total"] == 2
+        assert payload["ok"] == 1
+        assert payload["skipped"] == 1
+        assert payload["errors"] == 0
+
+        after = {p.name for p in out_dir.glob("*.png")}
+        created = sorted(after - before)
+        assert any(name.startswith("BATCH-1") and name.endswith(".png") for name in created)
+    finally:
+        # Cleanup only files created by this test run.
+        after = {p.name for p in out_dir.glob("*.png")}
+        for name in (after - before):
+            try:
+                (out_dir / name).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
+def test_email_requires_smtp_fields(client: TestClient) -> None:
+    r = client.post(
+        "/email",
+        json={
+            "members": [{"name": "Test", "id_number": "1", "date": "", "email": "x@example.com"}],
+            "smtp": {"host": "", "port": 587, "use_tls": True, "use_ssl": False, "username": "", "password": "", "from_name": "", "from_email": ""},
+        },
+    )
+    assert r.status_code == 400
+
