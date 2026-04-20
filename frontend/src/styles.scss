@@ -1,1 +1,89 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global theme (adapted from UIP project) */
+
+:root {
+  color-scheme: light;
+
+  --uip-bg: #fffaf5;
+  --uip-surface: #ffffff;
+  --uip-surface-alt: #fff7ed;
+  --uip-border: #f3e2d5;
+  --uip-border-strong: #e6cbb5;
+
+  --uip-text: #3a2e2a;
+  --uip-text-muted: #6b5b53;
+  --uip-text-soft: #9a857a;
+
+  --uip-primary: #f97316;
+  --uip-primary-hover: #ea580c;
+  --uip-primary-soft: #fff3e6;
+
+  --uip-success: #16a34a;
+  --uip-success-soft: #e8f7ee;
+
+  --uip-warning: #eab308;
+  --uip-warning-soft: #fff9db;
+
+  --uip-danger: #dc2626;
+  --uip-danger-soft: #fdecea;
+
+  --uip-info: #0f766e;
+  --uip-info-soft: #e6fffb;
+
+  --uip-shadow-sm: 0 1px 3px rgba(120, 80, 40, 0.08);
+  --uip-shadow-md: 0 10px 30px rgba(120, 80, 40, 0.10);
+  --uip-shadow-lg: 0 20px 40px rgba(120, 80, 40, 0.12);
+
+  --uip-radius-sm: 10px;
+  --uip-radius-md: 16px;
+  --uip-radius-lg: 22px;
+
+  --uip-space-1: 0.35rem;
+  --uip-space-2: 0.5rem;
+  --uip-space-3: 0.75rem;
+  --uip-space-4: 1rem;
+  --uip-space-5: 1.25rem;
+  --uip-space-6: 1.5rem;
+  --uip-space-7: 2rem;
+  --uip-space-8: 2.5rem;
+
+  --uip-font-sans: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--uip-bg);
+  color: var(--uip-text);
+  font-family: var(--uip-font-sans);
+}
+
+body {
+  line-height: 1.45;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  background: var(--uip-surface-alt);
+  border: 1px solid var(--uip-border);
+  padding: 0.1rem 0.35rem;
+  border-radius: 8px;
+}
