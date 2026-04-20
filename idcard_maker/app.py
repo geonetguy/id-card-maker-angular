@@ -18,6 +18,7 @@ import toga
 
 from .api_app import app as api_app
 from .api_app import set_choose_output_dir_callback
+from .api_app import set_choose_asset_callback
 from .constants import APP_TITLE
 from .core.resources import resource_path
 
@@ -31,6 +32,8 @@ class IDCardApp(toga.App):
 
         self._output_dir: Path | None = None
         self._output_dir_requests: "queue.Queue[tuple[Future[str | None], str | None]]" = queue.Queue()
+
+        self._asset_requests: "queue.Queue[tuple[Future[str | None], str, str | None]]" = queue.Queue()
 
     def _is_port_open(self, host: str, port: int, timeout_s: float = 0.15) -> bool:
         try:
@@ -132,6 +135,14 @@ class IDCardApp(toga.App):
         except Exception:
             return None
 
+    def _choose_asset_blocking(self, kind: str, initial_dir: str | None) -> str | None:
+        fut: Future[str | None] = Future()
+        self._asset_requests.put((fut, kind, initial_dir))
+        try:
+            return fut.result(timeout=300)
+        except Exception:
+            return None
+
     async def _run_folder_picker(self, fut: Future[str | None], initial_dir: str | None) -> None:
         try:
             initial: Path | str | None = self._output_dir or None
@@ -162,16 +173,50 @@ class IDCardApp(toga.App):
             except Exception:
                 pass
 
+    async def _run_asset_picker(self, fut: Future[str | None], kind: str, initial_dir: str | None) -> None:
+        try:
+            title = "Choose template image" if kind == "template" else "Choose signature image"
+            initial: Path | str | None = initial_dir or None
+            dialog = toga.OpenFileDialog(
+                title=title,
+                initial_directory=initial,
+                multiple_select=False,
+                file_types=["png", "jpg", "jpeg", "bmp", "gif", "webp"],
+            )
+            result = await self.main_window.dialog(dialog)
+            chosen: Path | None
+            if isinstance(result, list):
+                chosen = result[0] if result else None
+            else:
+                chosen = result
+
+            fut.set_result(str(chosen) if chosen else None)
+        except Exception:
+            try:
+                fut.set_result(None)
+            except Exception:
+                pass
+
     async def on_running(self) -> None:
         # Process folder-picking requests coming from the API thread.
         while True:
             try:
                 fut, initial_dir = self._output_dir_requests.get_nowait()
             except queue.Empty:
-                await asyncio.sleep(0.1)
-                continue
+                fut = None
 
-            await self._run_folder_picker(fut, initial_dir)
+            if fut is not None:
+                await self._run_folder_picker(fut, initial_dir)
+
+            try:
+                asset_fut, kind, asset_initial = self._asset_requests.get_nowait()
+            except queue.Empty:
+                asset_fut = None
+
+            if asset_fut is not None:
+                await self._run_asset_picker(asset_fut, kind, asset_initial)
+
+            await asyncio.sleep(0.1)
 
     def _find_free_port(self, host: str = "127.0.0.1") -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -288,6 +333,7 @@ class IDCardApp(toga.App):
 
         # Allow the Angular UI to open a native folder picker via the API.
         set_choose_output_dir_callback(self._choose_output_dir_blocking)
+        set_choose_asset_callback(self._choose_asset_blocking)
 
         # Start backend API in-process (no business logic duplication in Angular).
         self._start_api_server()

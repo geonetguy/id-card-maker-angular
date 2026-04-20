@@ -19,6 +19,12 @@
           accept="image/*"
           (change)="onPickImage('template', $any($event.target).files?.item(0) ?? null)"
         />
+        <div class="row">
+          <button class="btn btn--secondary" (click)="chooseDefaultAsset('template')" [disabled]="isLoading()">
+            Choose default…
+          </button>
+          <span class="status" *ngIf="templatePath()">{{ templatePath() }}</span>
+        </div>
       </div>
 
       <div class="field">
@@ -28,6 +34,12 @@
           accept="image/*"
           (change)="onPickImage('signature', $any($event.target).files?.item(0) ?? null)"
         />
+        <div class="row">
+          <button class="btn btn--secondary" (click)="chooseDefaultAsset('signature')" [disabled]="isLoading()">
+            Choose default…
+          </button>
+          <span class="status" *ngIf="signaturePath()">{{ signaturePath() }}</span>
+        </div>
       </div>
 
       <h2>CSV</h2>
@@ -36,7 +48,10 @@
         <input type="file" accept=".csv,text/csv" (change)="onUploadCsv($any($event.target).files?.item(0) ?? null)" />
       </div>
 
-      <h2>Member</h2>
+      <div class="sectionHeader">
+        <h2>Member</h2>
+        <button class="btn btn--secondary" (click)="newMember()" [disabled]="isLoading()">New</button>
+      </div>
 
       <div class="field">
         <label class="label">Name</label>
@@ -91,7 +106,6 @@
           Email card
         </button>
         <button class="btn btn--secondary" (click)="saveMember()" [disabled]="isLoading()">Save member</button>
-        <button class="btn btn--ghost" (click)="newMember()" [disabled]="isLoading()">New</button>
         <span class="status" *ngIf="isLoading()">Rendering…</span>
       </div>
 

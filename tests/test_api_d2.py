@@ -39,6 +39,31 @@ def test_config_exists(client: TestClient) -> None:
     assert "output_dir" in r.json()
 
 
+def test_asset_settings_roundtrip(client: TestClient) -> None:
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-assets-{uuid.uuid4().hex}"
+    td.mkdir(parents=True, exist_ok=True)
+    try:
+        os.environ["IDCARD_SETTINGS_PATH"] = str(td / "settings.json")
+        r = client.get("/settings/assets")
+        assert r.status_code == 200
+
+        r2 = client.put(
+            "/settings/assets",
+            json={"template_path": "C:\\fake\\template.png", "signature_path": "C:\\fake\\sig.png"},
+        )
+        assert r2.status_code == 200
+
+        r3 = client.get("/settings/assets")
+        assert r3.status_code == 200
+        assert r3.json()["template_path"] == "C:\\fake\\template.png"
+        assert r3.json()["signature_path"] == "C:\\fake\\sig.png"
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
+
+
 def test_email_settings_roundtrip(client: TestClient) -> None:
     td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-settings-{uuid.uuid4().hex}"
     td.mkdir(parents=True, exist_ok=True)

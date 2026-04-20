@@ -57,6 +57,7 @@ if not _DEFAULT_FONT_PATH.exists():
     _DEFAULT_FONT_PATH = None
 
 _choose_output_dir_callback: Optional[Callable[[Optional[str]], Optional[str]]] = None
+_choose_asset_callback: Optional[Callable[[str, Optional[str]], Optional[str]]] = None
 
 
 def set_choose_output_dir_callback(cb: Callable[[Optional[str]], Optional[str]]) -> None:
@@ -68,6 +69,17 @@ def set_choose_output_dir_callback(cb: Callable[[Optional[str]], Optional[str]])
     """
     global _choose_output_dir_callback
     _choose_output_dir_callback = cb
+
+
+def set_choose_asset_callback(cb: Callable[[str, Optional[str]], Optional[str]]) -> None:
+    """
+    Injected by the Toga shell at runtime.
+
+    Callback args: (kind, initial_dir). kind is "template" or "signature".
+    Returns a filesystem path (string), or None if cancelled.
+    """
+    global _choose_asset_callback
+    _choose_asset_callback = cb
 
 
 def _default_output_dir() -> Path:
@@ -155,6 +167,29 @@ class ChooseOutputDirIn(BaseModel):
 
 class ChooseOutputDirOut(BaseModel):
     output_dir: Optional[str] = None
+
+
+class AssetSettings(BaseModel):
+    template_path: Optional[str] = None
+    signature_path: Optional[str] = None
+
+
+class ChooseAssetIn(BaseModel):
+    kind: Literal["template", "signature"]
+    initial_dir: Optional[str] = None
+
+
+class ChooseAssetOut(BaseModel):
+    kind: Literal["template", "signature"]
+    path: Optional[str] = None
+    base64: Optional[str] = None
+
+
+class AssetDefaultsOut(BaseModel):
+    template_path: Optional[str] = None
+    signature_path: Optional[str] = None
+    template_base64: Optional[str] = None
+    signature_base64: Optional[str] = None
 
 
 _DEFAULT_SUBJECT_TPL = "Your ID card, {name}"
@@ -372,6 +407,70 @@ def put_email_settings(body: EmailSettingsV2) -> EmailSettingsV2:
     # Always return with baked-in defaults.
     body.defaults = _email_defaults()
     return body
+
+
+@app.get("/settings/assets", response_model=AssetSettings)
+def get_asset_settings() -> AssetSettings:
+    data = _read_settings_json()
+    raw = data.get("assets", {}) if isinstance(data, dict) else {}
+    try:
+        return AssetSettings(**(raw or {}))
+    except Exception:
+        return AssetSettings()
+
+
+@app.put("/settings/assets", response_model=AssetSettings)
+def put_asset_settings(body: AssetSettings) -> AssetSettings:
+    data = _read_settings_json()
+    if not isinstance(data, dict):
+        data = {}
+    data["assets"] = body.model_dump()
+    _write_settings_json(data)
+    return body
+
+
+@app.post("/choose-asset", response_model=ChooseAssetOut)
+def choose_asset(body: ChooseAssetIn) -> ChooseAssetOut:
+    if _choose_asset_callback is None:
+        raise HTTPException(status_code=501, detail="file_picker_not_available")
+
+    path = _choose_asset_callback(body.kind, (body.initial_dir or "").strip() or None)
+    if not path:
+        return ChooseAssetOut(kind=body.kind, path=None, base64=None)
+
+    p = Path(path).expanduser()
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="not_found")
+
+    try:
+        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+        return ChooseAssetOut(kind=body.kind, path=str(p), base64=b64)
+    except Exception:
+        raise HTTPException(status_code=500, detail="internal_error")
+
+
+@app.get("/assets/defaults", response_model=AssetDefaultsOut)
+def asset_defaults() -> AssetDefaultsOut:
+    settings = get_asset_settings()
+    out = AssetDefaultsOut(
+        template_path=settings.template_path,
+        signature_path=settings.signature_path,
+    )
+
+    def try_load(path_str: Optional[str]) -> Optional[str]:
+        if not path_str:
+            return None
+        p = Path(path_str).expanduser()
+        if not p.exists():
+            return None
+        try:
+            return base64.b64encode(p.read_bytes()).decode("ascii")
+        except Exception:
+            return None
+
+    out.template_base64 = try_load(settings.template_path)
+    out.signature_base64 = try_load(settings.signature_path)
+    return out
 
 
 @app.post("/choose-output-dir", response_model=ChooseOutputDirOut)

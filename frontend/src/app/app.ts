@@ -23,6 +23,13 @@ type GenerateBatchOut = {
 type GenerateOut = { filename: string; path: string; output_dir: string };
 type ConfigOut = { output_dir?: string | null };
 type ChooseOutputDirOut = { output_dir?: string | null };
+type AssetDefaultsOut = {
+  template_path?: string | null;
+  signature_path?: string | null;
+  template_base64?: string | null;
+  signature_base64?: string | null;
+};
+type ChooseAssetOut = { kind: 'template' | 'signature'; path?: string | null; base64?: string | null };
 type OpenPathOut = { ok: boolean };
 type EmailResult = { index: number; result: 'sent' | 'skipped' | 'error'; message?: string | null };
 type EmailOut = { total: number; sent: number; skipped: number; errors: number; results: EmailResult[] };
@@ -68,6 +75,8 @@ export class App {
 
   protected readonly templateBase64 = signal<string | null>(null);
   protected readonly signatureBase64 = signal<string | null>(null);
+  protected readonly templatePath = signal<string | null>(null);
+  protected readonly signaturePath = signal<string | null>(null);
 
   protected readonly previewPngBase64 = signal<string | null>(null);
   protected readonly warning = signal<string | null>(null);
@@ -120,7 +129,29 @@ export class App {
       // ignore; API may not be up yet
     }
 
+    await this.loadAssetDefaults();
     await this.loadEmailSettings();
+  }
+
+  protected async loadAssetDefaults(): Promise<void> {
+    try {
+      const d = await firstValueFrom(
+        this.http.get<AssetDefaultsOut>(`${this.apiBase}/assets/defaults`)
+      );
+      const tplB64 = (d?.template_base64 ?? '').toString().trim();
+      const sigB64 = (d?.signature_base64 ?? '').toString().trim();
+      const tplPath = (d?.template_path ?? '').toString().trim();
+      const sigPath = (d?.signature_path ?? '').toString().trim();
+
+      this.templatePath.set(tplPath || null);
+      this.signaturePath.set(sigPath || null);
+      if (tplB64) this.templateBase64.set(tplB64);
+      if (sigB64) this.signatureBase64.set(sigB64);
+
+      if (tplB64 || sigB64) this.schedulePreview();
+    } catch {
+      // ignore
+    }
   }
 
   protected openSettings(): void {
@@ -177,6 +208,47 @@ export class App {
     if (kind === 'template') this.templateBase64.set(b64);
     if (kind === 'signature') this.signatureBase64.set(b64);
     this.schedulePreview();
+  }
+
+  protected async chooseDefaultAsset(kind: 'template' | 'signature'): Promise<void> {
+    this.error.set(null);
+    try {
+      const initialDir =
+        kind === 'template'
+          ? (this.templatePath() || null)
+          : (this.signaturePath() || null);
+
+      const resp = await firstValueFrom(
+        this.http.post<ChooseAssetOut>(`${this.apiBase}/choose-asset`, {
+          kind,
+          initial_dir: initialDir,
+        })
+      );
+
+      const path = (resp?.path ?? '').toString().trim();
+      const b64 = (resp?.base64 ?? '').toString().trim();
+      if (!path || !b64) return;
+
+      if (kind === 'template') {
+        this.templatePath.set(path);
+        this.templateBase64.set(b64);
+      } else {
+        this.signaturePath.set(path);
+        this.signatureBase64.set(b64);
+      }
+
+      await firstValueFrom(
+        this.http.put(`${this.apiBase}/settings/assets`, {
+          template_path: this.templatePath(),
+          signature_path: this.signaturePath(),
+        })
+      );
+
+      this.schedulePreview();
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to choose default asset.';
+      this.error.set(String(msg));
+    }
   }
 
   protected async onUploadCsv(file: File | null): Promise<void> {
