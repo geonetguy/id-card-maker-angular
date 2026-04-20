@@ -392,6 +392,32 @@ export class App {
     this.selectRow(updated.length - 1);
   }
 
+  protected removeMember(index: number): void {
+    const rows = this.members();
+    if (index < 0 || index >= rows.length) return;
+
+    const next = rows.slice();
+    next.splice(index, 1);
+    this.members.set(next);
+
+    const sel = this.selectedIndex();
+    if (sel === null) return;
+
+    if (sel === index) {
+      this.selectedIndex.set(null);
+      this.name.set('');
+      this.idNumber.set('');
+      this.date.set('');
+      this.email.set('');
+      this.schedulePreview();
+      return;
+    }
+
+    if (sel > index) {
+      this.selectedIndex.set(sel - 1);
+    }
+  }
+
   protected toggleSelectAll(enabled: boolean): void {
     this.selectAll.set(!!enabled);
     const rows = this.members();

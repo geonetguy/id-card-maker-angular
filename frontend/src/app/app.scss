@@ -388,6 +388,34 @@
   text-align: center;
 }
 
+.colActions {
+  width: 44px;
+  padding: 10px 10px !important;
+  text-align: center;
+}
+
+.iconBtn {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--uip-border);
+  background: var(--uip-surface-alt);
+  color: var(--uip-text-muted);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.iconBtn:hover:not(:disabled) {
+  border-color: var(--uip-border-strong);
+  color: var(--uip-danger);
+  background: #fffdfb;
+}
+
+.iconBtn:disabled {
+  opacity: 0.55;
+}
+
 .tableCellInput {
   width: 100%;
   box-sizing: border-box;

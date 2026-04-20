@@ -127,31 +127,6 @@
         <ng-template #noPreview>
           <div class="empty">Choose a template to render a preview.</div>
         </ng-template>
-
-        <div class="actions">
-          <button
-            class="btn"
-            (click)="generateOne()"
-            [disabled]="isLoading() || !assetsReady() || selectedIndex() === null || !memberComplete()"
-          >
-            Generate card
-          </button>
-          <button
-            class="btn btn--secondary"
-            (click)="sendEmailOne()"
-            [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedIndex() === null || !idNumber().trim() || !email().trim()"
-          >
-            Email card
-          </button>
-          <span class="status" *ngIf="isLoading()">Rendering…</span>
-        </div>
-
-        <div class="actions" *ngIf="generateStatus() || lastGenerated()">
-          <button class="btn btn--secondary" (click)="downloadLast()" [disabled]="isLoading() || !lastGenerated()">Download PNG</button>
-          <button class="btn btn--secondary" (click)="openGenerated('file')" [disabled]="isLoading() || !lastGenerated()">Open file</button>
-          <button class="btn btn--secondary" (click)="openGenerated('folder')" [disabled]="isLoading() || !lastGenerated()">Open folder</button>
-          <span class="status" *ngIf="generateStatus()">{{ generateStatus() }}</span>
-        </div>
       </section>
 
       <section class="panel panel--table">
@@ -159,7 +134,7 @@
 
         <div class="actions">
           <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">
-            Add member row
+            Add member
           </button>
         </div>
 
@@ -209,6 +184,7 @@
                 <th>ID Number</th>
                 <th>Date</th>
                 <th>Email</th>
+                <th class="colActions"></th>
               </tr>
             </thead>
             <tbody>
@@ -262,6 +238,11 @@
                         (input)="updateRowField($index, 'email', $any($event.target).value)"
                       />
                     </td>
+                    <td class="colActions" (click)="$event.stopPropagation()">
+                      <button class="iconBtn" (click)="removeMember($index)" [disabled]="isLoading()" title="Remove row">
+                        ×
+                      </button>
+                    </td>
                   </tr>
                 }
               } @else {
@@ -271,6 +252,7 @@
                   <td><input class="tableCellInput" disabled value="" /></td>
                   <td><input class="tableCellInput" disabled value="" /></td>
                   <td><input class="tableCellInput" disabled value="" /></td>
+                  <td class="colActions"></td>
                 </tr>
               }
             </tbody>
