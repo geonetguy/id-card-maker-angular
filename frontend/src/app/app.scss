@@ -382,19 +382,19 @@
   color: var(--uip-text-muted);
 }
 
-.row {
+.tableRow {
   cursor: pointer;
 }
 
-.row:hover td {
+.tableRow:hover td {
   background: rgba(249, 115, 22, 0.05);
 }
 
-.row--selected td {
+.tableRow--selected td {
   background: var(--uip-primary-soft);
 }
 
-.row--placeholder td {
+.tableRow--placeholder td {
   height: 44px;
 }
 
