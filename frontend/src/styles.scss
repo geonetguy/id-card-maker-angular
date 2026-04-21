@@ -17,6 +17,19 @@
   --uip-primary-hover: #ea580c;
   --uip-primary-soft: #fff3e6;
 
+  --uip-accent: #16a34a;
+  --uip-accent-hover: #15803d;
+  --uip-accent-soft: #e8f7ee;
+
+  /* Banner gradient: subtle green → pale yellow to match the app background */
+  --uip-brand-gradient: linear-gradient(
+    90deg,
+    #e8f7ee 0%,
+    #e6fffb 38%,
+    #fff7ed 72%,
+    #fff9db 100%
+  );
+
   --uip-success: #16a34a;
   --uip-success-soft: #e8f7ee;
 

@@ -39,6 +39,29 @@ def test_config_exists(client: TestClient) -> None:
     assert "output_dir" in r.json()
 
 
+def test_output_settings_roundtrip(client: TestClient) -> None:
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-output-{uuid.uuid4().hex}"
+    td.mkdir(parents=True, exist_ok=True)
+    try:
+        os.environ["IDCARD_SETTINGS_PATH"] = str(td / "settings.json")
+
+        r0 = client.get("/settings/output")
+        assert r0.status_code == 200
+
+        r1 = client.put("/settings/output", json={"output_dir": "C:\\fake\\out"})
+        assert r1.status_code == 200
+        assert r1.json()["output_dir"] == "C:\\fake\\out"
+
+        r2 = client.get("/config")
+        assert r2.status_code == 200
+        assert r2.json()["output_dir"] == "C:\\fake\\out"
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
+
+
 def test_asset_settings_roundtrip(client: TestClient) -> None:
     td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-assets-{uuid.uuid4().hex}"
     td.mkdir(parents=True, exist_ok=True)
@@ -105,6 +128,8 @@ def test_email_settings_roundtrip(client: TestClient) -> None:
         payload["microsoft"]["email"] = "sender@example.com"
         payload["microsoft"]["password"] = "secret"
         payload["microsoft"]["save_password"] = True
+        payload["union_management"]["enabled"] = True
+        payload["union_management"]["email"] = "ums@example.com"
 
         r2 = client.put("/settings/email", json=payload)
         assert r2.status_code == 200
@@ -115,6 +140,8 @@ def test_email_settings_roundtrip(client: TestClient) -> None:
         assert data["active"] == "microsoft"
         assert data["microsoft"]["email"] == "sender@example.com"
         assert data["microsoft"]["password"] == "secret"
+        assert data["union_management"]["enabled"] is True
+        assert data["union_management"]["email"] == "ums@example.com"
         assert data["defaults"]["microsoft"]["smtp_server"] == "smtp.office365.com"
     finally:
         try:
@@ -127,7 +154,7 @@ def test_preview_returns_png_base64(client: TestClient) -> None:
     r = client.post(
         "/preview",
         json={
-            "member": {"name": "Test", "id_number": "123", "date": "2026-04-19", "email": "x@example.com"},
+            "member": {"name": "Test", "id_number": "2010031", "date": "2026-04-19", "email": "x@example.com"},
             "template_base64": _png_b64(),
             "signature_base64": None,
         },
@@ -142,9 +169,9 @@ def test_preview_returns_png_base64(client: TestClient) -> None:
 def test_upload_csv_parses_and_normalizes(client: TestClient) -> None:
     csv_bytes = (
         "Name,ID Number,Date,Email\n"
-        "Alice,1001,04/19/2026,alice@example.com\n"
-        "Dash,1003,2026\u201104\u201120,dash@example.com\n"
-        "Bob,1002,not-a-date,bob@example.com\n"
+        "Alice,2010031,04/19/2026,alice@example.com\n"
+        "Dash,2010033,2026\u201104\u201120,dash@example.com\n"
+        "Bob,2010032,not-a-date,bob@example.com\n"
     ).encode("utf-8")
 
     r = client.post(
@@ -153,11 +180,11 @@ def test_upload_csv_parses_and_normalizes(client: TestClient) -> None:
     )
     assert r.status_code == 200
     members = r.json()["members"]
-    assert members[0]["id_number"] == "1001"
+    assert members[0]["id_number"] == "2010031"
     assert members[0]["date"] == "2026-04-19"
-    assert members[1]["id_number"] == "1003"
+    assert members[1]["id_number"] == "2010033"
     assert members[1]["date"] == "2026-04-20"
-    assert members[2]["id_number"] == "1002"
+    assert members[2]["id_number"] == "2010032"
     assert members[2]["date"] == ""
 
 
@@ -171,7 +198,7 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
             "/generate-batch",
             json={
                 "members": [
-                    {"name": "Make Me", "id_number": "BATCH-1", "date": "2026-04-19", "email": "m@example.com"},
+                    {"name": "Make Me", "id_number": "2010031", "date": "2026-04-19", "email": "m@example.com"},
                 ],
                 "template_base64": _png_b64(),
                 "signature_base64": None,
@@ -189,7 +216,7 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
 
         after = {p.name for p in out_dir.glob("*.png")}
         created = sorted(after - before)
-        assert any(name.startswith("BATCH-1") and name.endswith(".png") for name in created)
+        assert any(name.startswith("2010031") and name.endswith(".png") for name in created)
     finally:
         # Cleanup only files created by this test run.
         after = {p.name for p in out_dir.glob("*.png")}
@@ -215,6 +242,22 @@ def test_generate_batch_requires_all_fields(client: TestClient) -> None:
     assert "date is required" in str(r.json().get("detail", "")).lower()
 
 
+def test_generate_batch_rejects_invalid_formats(client: TestClient) -> None:
+    r = client.post(
+        "/generate-batch",
+        json={
+            "members": [
+                {"name": "Bad", "id_number": "ABC", "date": "04/19/2026", "email": "not-an-email"},
+            ],
+            "template_base64": _png_b64(),
+            "signature_base64": None,
+        },
+    )
+    assert r.status_code == 400
+    detail = str(r.json().get("detail", "")).lower()
+    assert ("id_number is invalid" in detail) or ("date is invalid" in detail) or ("email is invalid" in detail)
+
+
 def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) -> None:
     out_dir = project_output_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -224,7 +267,7 @@ def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) 
         r = client.post(
             "/generate",
             json={
-                "member": {"name": "Test", "id_number": "SINGLE-1", "date": "2026-04-19", "email": "x@example.com"},
+                "member": {"name": "Test", "id_number": "2010032", "date": "2026-04-19", "email": "x@example.com"},
                 "template_base64": _png_b64(),
                 "signature_base64": None,
                 "output_dir": str(out_dir),
@@ -238,7 +281,7 @@ def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) 
 
         after = {p.name for p in out_dir.glob("*.png")}
         created = sorted(after - before)
-        assert any(name.startswith("SINGLE-1") and name.endswith(".png") for name in created)
+        assert any(name.startswith("2010032") and name.endswith(".png") for name in created)
     finally:
         after = {p.name for p in out_dir.glob("*.png")}
         for name in (after - before):

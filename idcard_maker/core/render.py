@@ -59,6 +59,94 @@ def _fit_font_to_width_px(
         return ImageFont.load_default()
 
 
+def _fit_font_to_width_px_result(
+    *,
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font_path: Optional[Path],
+    start_size: int,
+    min_size: int,
+    max_width_px: int,
+) -> tuple[ImageFont.ImageFont, bool]:
+    """
+    Like _fit_font_to_width_px, but also reports whether the returned font actually fits.
+    """
+    if not (font_path and font_path.exists()):
+        font = ImageFont.load_default()
+        return font, (_text_width_px(draw, text, font) <= max_width_px)
+
+    for size in range(start_size, max(min_size, 1) - 1, -1):
+        try:
+            font = ImageFont.truetype(str(font_path), size)
+        except OSError:
+            font = ImageFont.load_default()
+            return font, (_text_width_px(draw, text, font) <= max_width_px)
+        if _text_width_px(draw, text, font) <= max_width_px:
+            return font, True
+
+    try:
+        font = ImageFont.truetype(str(font_path), max(min_size, 1))
+    except OSError:
+        font = ImageFont.load_default()
+    return font, (_text_width_px(draw, text, font) <= max_width_px)
+
+
+def _best_two_line_split(
+    *,
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font_path: Optional[Path],
+    start_size: int,
+    min_size: int,
+    max_width_px: int,
+) -> tuple[str, str, ImageFont.ImageFont]:
+    words = [w for w in (text or "").split() if w]
+    if len(words) < 2:
+        font, _ = _fit_font_to_width_px_result(
+            draw=draw,
+            text=text,
+            font_path=font_path,
+            start_size=start_size,
+            min_size=min_size,
+            max_width_px=max_width_px,
+        )
+        return text, "", font
+
+    # Choose the largest font size that can accommodate *some* 2-line split.
+    for size in range(start_size, max(min_size, 1) - 1, -1):
+        try:
+            font = ImageFont.truetype(str(font_path), size) if (font_path and font_path.exists()) else ImageFont.load_default()
+        except OSError:
+            font = ImageFont.load_default()
+
+        best: tuple[int, str, str] | None = None
+        for i in range(1, len(words)):
+            a = " ".join(words[:i])
+            b = " ".join(words[i:])
+            w = max(_text_width_px(draw, a, font), _text_width_px(draw, b, font))
+            if w <= max_width_px:
+                if best is None or w < best[0]:
+                    best = (w, a, b)
+
+        if best is not None:
+            _, a, b = best
+            return a, b, font
+
+    # Fallback: force split near the middle using min_size font; may still overflow, but avoids "hard" truncation.
+    mid = max(1, len(words) // 2)
+    a = " ".join(words[:mid])
+    b = " ".join(words[mid:])
+    font, _ = _fit_font_to_width_px_result(
+        draw=draw,
+        text=max(a, b, key=len),
+        font_path=font_path,
+        start_size=start_size,
+        min_size=min_size,
+        max_width_px=max_width_px,
+    )
+    return a, b, font
+
+
 def _draw_centered_in_xrange(
     *,
     draw: ImageDraw.ImageDraw,
@@ -119,15 +207,30 @@ def generate_id_card(
 
     # Fixed text positions
     if name_text:
-        name_font = _fit_font_to_width_px(
+        cleaned = " ".join(name_text.split())
+        max_name_w = (NAME_X2 - NAME_X1)
+        name_font, fits = _fit_font_to_width_px_result(
             draw=draw,
-            text=name_text,
+            text=cleaned,
             font_path=font_path,
             start_size=FONT_SIZE_NAME + 6,
-            min_size=14,
-            max_width_px=(NAME_X2 - NAME_X1),
+            min_size=12,
+            max_width_px=max_name_w,
         )
-        _draw_centered_in_xrange(draw=draw, text=name_text, font=name_font, y=98, x_left=NAME_X1, x_right=NAME_X2)
+        if fits:
+            _draw_centered_in_xrange(draw=draw, text=cleaned, font=name_font, y=98, x_left=NAME_X1, x_right=NAME_X2)
+        else:
+            a, b, two_font = _best_two_line_split(
+                draw=draw,
+                text=cleaned,
+                font_path=font_path,
+                start_size=FONT_SIZE_NAME + 4,
+                min_size=11,
+                max_width_px=max_name_w,
+            )
+            _draw_centered_in_xrange(draw=draw, text=a, font=two_font, y=88, x_left=NAME_X1, x_right=NAME_X2)
+            if b:
+                _draw_centered_in_xrange(draw=draw, text=b, font=two_font, y=110, x_left=NAME_X1, x_right=NAME_X2)
 
     if id_text:
         id_font = _fit_font_to_width_px(

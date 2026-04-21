@@ -91,6 +91,11 @@ Continue rebuilding the UI in Angular, maintaining workflow parity and improving
 - Output folder is now required (Generate/Email disabled until set), and removed developer-only header/API start hint text from the UI.
 - Styled the Batch/Email notification area above the members table and increased its text size.
 - Required-field and required-output-folder messages now render inside the styled notification area (larger text, consistent styling).
+- Button theme updated for clearer active/inactive states (stronger hover, focus-visible ring, and distinct disabled styling).
+- Add member is now disabled until Template + Signature + Output folder are set. Output folder can be saved as a default via a checkbox (persisted in settings).
+- Output folder UX updated: “Choose folder …” button placed above the path field; Set as default remains after the field.
+- Added strict validation for ID Number (YYYYXX/YYYXXX digits), Date (YYYY-MM-DD), and Email; invalid fields are highlighted and actions are disabled until selected rows are valid.
+- Updated ID Number validation to the simplest rule: exactly 6 digits.
 
 ### Files Changed
 - idcard_maker/api_app.py

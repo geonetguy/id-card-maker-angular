@@ -110,17 +110,17 @@
       <tr>
         <td><strong>ID Number</strong></td>
         <td>Printed on the card; used as the base filename; required for generate/email.</td>
-        <td>Use the official member ID (example: <code>2026001</code>).</td>
+        <td>Format: <code>7 digits</code> (example: <code>2010031</code>).</td>
       </tr>
       <tr>
         <td><strong>Date</strong></td>
         <td>Printed on the card.</td>
-        <td>Best format is <code>YYYY-MM-DD</code>. Some common formats may normalize; unrecognized dates are left blank.</td>
+        <td>Required format: <code>YYYY-MM-DD</code> (example: <code>2026-04-20</code>).</td>
       </tr>
       <tr>
         <td><strong>Email</strong></td>
         <td>Destination for emailing cards.</td>
-        <td>Required for emailing; rows missing email will be skipped during email sending.</td>
+        <td>Required; must look like <code>name@example.com</code>.</td>
       </tr>
     </tbody>
   </table>
@@ -149,11 +149,11 @@
       <tr><th class="mono">name</th><th class="mono">id_number</th><th class="mono">date</th><th class="mono">email</th></tr>
     </thead>
     <tbody>
-      <tr><td>Jane Smith</td><td>2026001</td><td>2026-04-20</td><td>jane@example.com</td></tr>
+      <tr><td>Jane Smith</td><td>2010031</td><td>2026-04-20</td><td>jane@example.com</td></tr>
     </tbody>
   </table>
   <ul>
-    <li>If the date format is recognized, it’s normalized to <code>YYYY-MM-DD</code>. If not recognized, it may be left blank.</li>
+    <li>Dates are normalized to <code>YYYY-MM-DD</code> on import when possible. You can only generate/email when the Date column contains valid <code>YYYY-MM-DD</code> values.</li>
     <li>After import, use the checkboxes to choose which rows to generate/email.</li>
   </ul>
 
@@ -176,6 +176,7 @@
   <ol>
     <li>Open <strong>Email settings</strong> (top menu area).</li>
     <li>Choose the active account: <strong>Microsoft</strong> or <strong>Gmail</strong>.</li>
+    <li>Optional: enable <strong>Union Management System</strong> and enter its email to send a copy of every card email.</li>
     <li>Enter <strong>Email</strong> and <strong>Password</strong> for the active account. (An app password may be required.)</li>
     <li>Optionally set <strong>From name</strong>, and customize the <strong>Subject</strong> and <strong>Body</strong> templates.</li>
     <li>Click <strong>Save</strong>. Then click <strong>Email card(s)</strong> above the members table.</li>

@@ -1,6 +1,9 @@
 <div class="app">
   <header class="header">
-    <div class="header__title">ID Card Maker</div>
+    <div class="header__brand">
+      <img class="header__logo" src="/cupe-logo.png" alt="CUPE 3523" />
+      <div class="header__title">ID Card Maker</div>
+    </div>
     <div class="header__menu">
       <div class="pill">Active email: {{ emailActive() === 'microsoft' ? 'Microsoft' : 'Gmail' }}</div>
       <button class="btn btn--secondary" (click)="openSettings()">Email settings</button>
@@ -40,7 +43,7 @@
       </div>
 
       <div class="field">
-        <label class="label">Signature image (optional)</label>
+        <label class="label">Signature image (required)</label>
         <div class="fileRow">
           <input
             #signatureFile
@@ -87,29 +90,30 @@
       <div class="field">
         <label class="label">Output folder (required)</label>
         <div class="row">
+          <button class="btn btn--secondary" (click)="chooseOutputDir()" [disabled]="isLoading() || isChoosingOutputDir()">
+            Choose folder …
+          </button>
+        </div>
+        <div class="row">
           <input
             class="input"
             placeholder="e.g. C:\\Users\\you\\Documents\\ID Cards"
             [value]="outputDir()"
             (input)="onOutputDirChange($any($event.target).value)"
           />
-          <button class="btn btn--secondary" (click)="chooseOutputDir()" [disabled]="isLoading() || isChoosingOutputDir()">
-            Choose…
-          </button>
+        </div>
+        <div class="row row--wrap">
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              [checked]="outputDefaultEnabled()"
+              (change)="setDefaultOutputDir($any($event.target).checked)"
+              [disabled]="isLoading()"
+            />
+            Set as default
+          </label>
         </div>
         <div class="hint">Generate and email actions require an output folder.</div>
-      </div>
-
-      <div class="callouts" *ngIf="error() || warning()">
-        <div class="callout callout--error" *ngIf="error()">{{ error() }}</div>
-        <div class="callout callout--warn" *ngIf="warning()">
-          Warning:
-          {{
-            warning() === 'unrecognized_date_format_left_blank'
-              ? 'Unrecognized date format → left blank.'
-              : warning()
-          }}
-        </div>
       </div>
 
     </section>
@@ -130,9 +134,9 @@
 
         <div class="tableToolbar">
           <div class="actions">
-            <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">Add member</button>
-            <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Generate card(s)</button>
-            <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Email card(s)</button>
+            <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder()">Add member</button>
+            <button class="btn btn--secondary" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Generate card(s)</button>
+            <button class="btn btn--secondary" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Email card(s)</button>
             <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()">Open folder</button>
             <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0">Export CSV</button>
             <button class="btn btn--danger" (click)="clearCards()" [disabled]="isLoading()">
@@ -143,19 +147,30 @@
           <div
             class="statusStack"
             *ngIf="
+              error() ||
+              warning() ||
               emailStatus() ||
               batchStatus() ||
               (!hasOutputFolder()) ||
               (selectedCount() > 0 && !selectedRowsComplete())
             "
           >
+            <div class="status status--error" *ngIf="error()">{{ error() }}</div>
+            <div class="status status--warn" *ngIf="warning()">
+              Warning:
+              {{
+                warning() === 'unrecognized_date_format_left_blank'
+                  ? 'Unrecognized date format → left blank.'
+                  : warning()
+              }}
+            </div>
             <div class="status" *ngIf="emailStatus()">Email: {{ emailStatus() }}</div>
             <div class="status" *ngIf="batchStatus()">Batch: {{ batchStatus() }}</div>
             <div class="status status--req" *ngIf="!hasOutputFolder()">
               Required: choose an <strong>Output folder</strong> before generating or emailing cards.
             </div>
             <div class="status status--req" *ngIf="selectedCount() > 0 && !selectedRowsComplete()">
-              Required: fill <strong>Name</strong>, <strong>ID Number</strong>, <strong>Date</strong>, and <strong>Email</strong> for all selected rows.
+              Required/Invalid: fix <strong>Name</strong>, <strong>ID Number</strong> (<span class="mono">7 digits</span>), <strong>Date</strong> (<span class="mono">YYYY-MM-DD</span>), and <strong>Email</strong> for all selected rows.
             </div>
           </div>
 
@@ -216,7 +231,7 @@
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'name')"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'name')"
                         [value]="m.name"
                         (input)="updateRowField($index, 'name', $any($event.target).value)"
                       />
@@ -224,7 +239,7 @@
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'id_number')"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'id_number')"
                         [value]="m.id_number"
                         (input)="updateRowField($index, 'id_number', $any($event.target).value)"
                       />
@@ -232,7 +247,7 @@
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'date')"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'date')"
                         placeholder="YYYY-MM-DD"
                         [value]="m.date"
                         (input)="updateRowField($index, 'date', $any($event.target).value)"
@@ -241,7 +256,7 @@
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'email')"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'email')"
                         [value]="m.email"
                         (input)="updateRowField($index, 'email', $any($event.target).value)"
                       />
@@ -296,6 +311,22 @@
             <input type="radio" name="activeEmail" [checked]="emailActive() === 'gmail'" (change)="emailActive.set('gmail')" />
             Gmail
           </label>
+        </div>
+      </div>
+
+      <div class="panel panel--inner">
+        <h3>Union Management System</h3>
+        <div class="hint">Optional: send a copy of each emailed card to your Union Management System mailbox.</div>
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" [checked]="unionMgmtEnabled()" (change)="unionMgmtEnabled.set($any($event.target).checked)" />
+            Enable
+          </label>
+        </div>
+        <div class="field" *ngIf="unionMgmtEnabled()">
+          <label class="label">Email</label>
+          <input class="input" [value]="unionMgmtEmail()" (input)="unionMgmtEmail.set($any($event.target).value)" placeholder="ums@domain.com" />
+          <div class="hint">Must be a valid email address.</div>
         </div>
       </div>
 

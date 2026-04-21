@@ -15,9 +15,13 @@ from __future__ import annotations
 
 import csv
 import base64
+import datetime as _dt
 import io
 import json
 import os
+import re
+import smtplib
+import socket
 import sys
 import uuid
 from pathlib import Path
@@ -162,6 +166,10 @@ class ConfigOut(BaseModel):
     output_dir: Optional[str] = None
 
 
+class OutputSettings(BaseModel):
+    output_dir: Optional[str] = None
+
+
 class ChooseOutputDirIn(BaseModel):
     initial_dir: Optional[str] = None
 
@@ -222,10 +230,16 @@ class EmailProviderDefaults(BaseModel):
     smtp_encryption: str  # "STARTTLS" or "SSL/TLS"
 
 
+class UnionManagementSettings(BaseModel):
+    enabled: bool = False
+    email: str = ""
+
+
 class EmailSettingsV2(BaseModel):
     active: EmailProvider = "microsoft"
     microsoft: EmailAccountSettings = Field(default_factory=EmailAccountSettings)
     gmail: EmailAccountSettings = Field(default_factory=EmailAccountSettings)
+    union_management: UnionManagementSettings = Field(default_factory=UnionManagementSettings)
     defaults: dict[EmailProvider, EmailProviderDefaults] = Field(default_factory=dict)
 
 
@@ -346,6 +360,7 @@ def _email_settings_to_json(settings: EmailSettingsV2) -> dict:
         "active": settings.active,
         "microsoft": settings.microsoft.model_dump(),
         "gmail": settings.gmail.model_dump(),
+        "union_management": settings.union_management.model_dump(),
     }
 
 
@@ -415,7 +430,37 @@ def health() -> dict[str, str]:
 @app.get("/config", response_model=ConfigOut)
 def config() -> ConfigOut:
     override = (os.environ.get("IDCARD_OUTPUT_DIR") or "").strip()
-    return ConfigOut(output_dir=(override or None))
+    if override:
+        return ConfigOut(output_dir=override)
+
+    data = _read_settings_json()
+    if isinstance(data, dict):
+        out = (data.get("output", {}) or {}) if isinstance(data.get("output", {}), dict) else {}
+        val = (out.get("output_dir") or "").strip()
+        if val:
+            return ConfigOut(output_dir=val)
+
+    return ConfigOut(output_dir=None)
+
+
+@app.get("/settings/output", response_model=OutputSettings)
+def get_output_settings() -> OutputSettings:
+    data = _read_settings_json()
+    raw = data.get("output", {}) if isinstance(data, dict) else {}
+    try:
+        return OutputSettings(**(raw or {}))
+    except Exception:
+        return OutputSettings()
+
+
+@app.put("/settings/output", response_model=OutputSettings)
+def put_output_settings(body: OutputSettings) -> OutputSettings:
+    data = _read_settings_json()
+    if not isinstance(data, dict):
+        data = {}
+    data["output"] = body.model_dump()
+    _write_settings_json(data)
+    return body
 
 
 @app.get("/settings/email", response_model=EmailSettingsV2)
@@ -562,11 +607,33 @@ def _require_all_member_fields(m: MemberIn | MemberLooseIn, *, index: Optional[i
     if not email:
         raise HTTPException(status_code=400, detail=f"{prefix}email is required")
 
-    date_norm = _normalize_date(date_raw)
-    if not date_norm:
-        raise HTTPException(status_code=400, detail=f"{prefix}date is invalid (expected YYYY-MM-DD or a common format)")
+    # ID Number: simplest rule requested - exactly 7 digits.
+    if not re.fullmatch(r"\d{7}", idnum):
+        raise HTTPException(status_code=400, detail=f"{prefix}id_number is invalid (expected 7 digits)")
+
+    # Date must be strict ISO (YYYY-MM-DD) and a real date.
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_raw):
+        raise HTTPException(status_code=400, detail=f"{prefix}date is invalid (expected YYYY-MM-DD)")
+    try:
+        date_norm = _dt.date.fromisoformat(date_raw).isoformat()
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"{prefix}date is invalid (expected YYYY-MM-DD)")
+
+    # Email: basic sanity check (not a full RFC parser, but prevents obvious mistakes).
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=400, detail=f"{prefix}email is invalid")
 
     return {"name": name, "id_number": idnum, "date": date_norm, "email": email}
+
+
+def _normalize_optional_cc_email(value: str) -> Optional[str]:
+    v = (value or "").strip()
+    if not v:
+        return None
+    # Keep validation intentionally light; must be good enough for SMTP RCPT.
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+        return None
+    return v
 
 
 @app.post("/generate", response_model=GenerateOut)
@@ -829,6 +896,13 @@ async def email(body: EmailIn) -> EmailOut:
     if not body.members:
         raise HTTPException(status_code=400, detail="members is required")
 
+    settings_for_cc = _email_settings_from_json(_read_settings_json())
+    union_cc: Optional[str] = None
+    if settings_for_cc.union_management.enabled:
+        union_cc = _normalize_optional_cc_email(settings_for_cc.union_management.email)
+        if union_cc is None:
+            raise HTTPException(status_code=400, detail="union_management_email_is_invalid")
+
     # Use provided SMTP config if present; otherwise, use the active saved account.
     if body.smtp is not None:
         cfg = SMTPConfig(
@@ -844,10 +918,9 @@ async def email(body: EmailIn) -> EmailOut:
         subject_tpl = body.subject_tpl
         body_tpl = body.body_tpl
     else:
-        settings = _email_settings_from_json(_read_settings_json())
-        provider = settings.active
-        acct = settings.microsoft if provider == "microsoft" else settings.gmail
-        d = settings.defaults.get(provider) or _email_defaults()[provider]
+        provider = settings_for_cc.active
+        acct = settings_for_cc.microsoft if provider == "microsoft" else settings_for_cc.gmail
+        d = settings_for_cc.defaults.get(provider) or _email_defaults()[provider]
 
         email_addr = (acct.email or "").strip()
         password = (acct.password or "").strip()
@@ -940,6 +1013,8 @@ async def email(body: EmailIn) -> EmailOut:
                         body_text=render_tpl(body_tpl, m),
                         attachments=[attach],
                     )
+                    if union_cc and union_cc.strip().lower() != to_email.strip().lower():
+                        msg["Cc"] = union_cc
                     mailer.send(msg)
                     sent += 1
                     results.append(EmailResult(index=i, result="sent"))
@@ -948,7 +1023,25 @@ async def email(body: EmailIn) -> EmailOut:
                     results.append(EmailResult(index=i, result="error", message=str(e)))
     except HTTPException:
         raise
+    except (smtplib.SMTPAuthenticationError,) as e:
+        raise HTTPException(status_code=400, detail=f"smtp_auth_failed: {e}") from e
+    except (
+        smtplib.SMTPConnectError,
+        smtplib.SMTPServerDisconnected,
+        smtplib.SMTPRecipientsRefused,
+        smtplib.SMTPSenderRefused,
+        smtplib.SMTPDataError,
+        smtplib.SMTPHeloError,
+        smtplib.SMTPNotSupportedError,
+        smtplib.SMTPException,
+        TimeoutError,
+        socket.gaierror,
+        ConnectionError,
+        OSError,
+    ) as e:
+        # Surface the underlying SMTP/network error so the UI can show actionable feedback.
+        raise HTTPException(status_code=400, detail=f"email_failed: {type(e).__name__}: {e}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="internal_error") from e
+        raise HTTPException(status_code=500, detail=f"internal_error: {type(e).__name__}") from e
 
     return EmailOut(total=len(body.members), sent=sent, skipped=skipped, errors=errors, results=results)

@@ -24,6 +24,7 @@ type GenerateBatchOut = {
 
 type GenerateOut = { filename: string; path: string; output_dir: string };
 type ConfigOut = { output_dir?: string | null };
+type OutputSettingsOut = { output_dir?: string | null };
 type ChooseOutputDirOut = { output_dir?: string | null };
 type AssetDefaultsOut = {
   template_path?: string | null;
@@ -59,10 +60,15 @@ type EmailProviderDefaults = {
   smtp_port: number;
   smtp_encryption: string;
 };
+type UnionManagementSettings = {
+  enabled: boolean;
+  email: string;
+};
 type EmailSettingsV2 = {
   active: EmailProvider;
   microsoft: EmailAccountSettings;
   gmail: EmailAccountSettings;
+  union_management: UnionManagementSettings;
   defaults: Record<EmailProvider, EmailProviderDefaults>;
 };
 type ClearCardsOut = { output_dir: string; deleted: number };
@@ -82,6 +88,7 @@ export class App {
   protected readonly email = signal('');
   protected readonly outputDir = signal('');
   protected readonly isChoosingOutputDir = signal(false);
+  protected readonly outputDefaultEnabled = signal(false);
 
   protected readonly templateBase64 = signal<string | null>(null);
   protected readonly signatureBase64 = signal<string | null>(null);
@@ -109,6 +116,8 @@ export class App {
   protected readonly pendingSend = signal<'one' | 'batch' | null>(null);
   protected readonly emailActive = signal<EmailProvider>('microsoft');
   protected readonly emailDefaults = signal<Record<EmailProvider, EmailProviderDefaults> | null>(null);
+  protected readonly unionMgmtEnabled = signal(false);
+  protected readonly unionMgmtEmail = signal('');
 
   protected readonly msEmail = signal('');
   protected readonly msPassword = signal('');
@@ -135,7 +144,7 @@ export class App {
 
   protected readonly hasTemplate = computed(() => !!this.templateBase64());
   protected readonly hasSignature = computed(() => !!this.signatureBase64());
-  protected readonly assetsReady = computed(() => this.hasTemplate());
+  protected readonly assetsReady = computed(() => this.hasTemplate() && this.hasSignature());
 
   protected readonly memberComplete = computed(() => {
     return (
@@ -163,12 +172,7 @@ export class App {
     const chosen = this.selectAll() ? rows : rows.filter((r) => r.selected);
     if (!chosen.length) return false;
     return chosen.every((m) => {
-      return (
-        (m.name || '').trim().length > 0 &&
-        (m.id_number || '').trim().length > 0 &&
-        (m.date || '').trim().length > 0 &&
-        (m.email || '').trim().length > 0
-      );
+      return this.isRowValid(m);
     });
   });
 
@@ -179,6 +183,97 @@ export class App {
   protected isMissing(row: MemberRow, field: keyof Member): boolean {
     const v = (row[field] ?? '').toString().trim();
     return v.length === 0;
+  }
+
+  private isValidDate(value: string): boolean {
+    const v = (value ?? '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const [y, m, d] = v.split('-').map((x) => Number(x));
+    if (!y || !m || !d) return false;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === (m - 1) && dt.getUTCDate() === d;
+  }
+
+  private isValidEmail(value: string): boolean {
+    const v = (value ?? '').trim();
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+  }
+
+  private friendlyEmailFailureMessage(raw: string): string {
+    const msg = (raw ?? '').toString().trim();
+    const lower = msg.toLowerCase();
+
+    if (!msg) return 'Email failed.';
+
+    if (lower.includes('active_email_account_requires_email_and_password')) {
+      return 'Enter the email + password for the active account in Email settings, then try again.';
+    }
+    if (lower.includes('union_management_email_is_invalid')) {
+      return 'Union Management System email is invalid. Fix it in Email settings or disable it.';
+    }
+
+    // Common SMTP auth failures (Office365/Gmail).
+    if (lower.startsWith('smtp_auth_failed') || lower.includes('authentication unsuccessful') || lower.includes('535')) {
+      if (lower.includes('5.7.139')) {
+        return 'Microsoft 365 rejected the login (5.7.139). Check email/password; if you use MFA, use an app password. Your tenant may also need SMTP AUTH enabled.';
+      }
+      return 'Email login failed. Check email/password; if you use MFA, use an app password. Your provider may also require SMTP AUTH to be enabled.';
+    }
+
+    // Network/connectivity.
+    if (lower.includes('socket.gaierror') || lower.includes('name or service not known') || lower.includes('nodename nor servname')) {
+      return 'Could not resolve the SMTP server address (DNS). Check your internet/VPN and the SMTP server name.';
+    }
+    if (lower.includes('timeouterror') || lower.includes('timed out')) {
+      return 'Timed out connecting to the SMTP server. Check your internet connection and firewall rules for port 587.';
+    }
+    if (lower.includes('smtpconnecterror') || lower.includes('connection refused') || lower.includes('serverdisconnected')) {
+      return 'Could not connect to the SMTP server. Check network/firewall access and that the SMTP host/port are correct.';
+    }
+
+    // Address issues.
+    if (lower.includes('smtprecipientsrefused')) {
+      return 'The SMTP server refused the recipient address. Check the member email (and Union Management System email if enabled).';
+    }
+    if (lower.includes('smtpsenderrefused')) {
+      return 'The SMTP server refused the sender address. Check the account email and From name/email settings.';
+    }
+
+    // Backend-provided wrapped errors.
+    if (lower.startsWith('email_failed:')) {
+      return 'Email failed to send. Check your SMTP settings, network connection, and credentials.';
+    }
+
+    return msg;
+  }
+
+  private normalizeIdNumber(value: unknown): string {
+    const v = (value ?? '').toString().trim();
+    return v.replace(/[^\d]/g, '');
+  }
+
+  private isValidIdNumber(value: string): boolean {
+    const v = this.normalizeIdNumber(value);
+    return /^\d{7}$/.test(v);
+  }
+
+  protected isInvalid(row: MemberRow, field: keyof Member): boolean {
+    const raw = (row[field] ?? '').toString();
+    const v = raw.trim();
+    if (!v) return true;
+    if (field === 'date') return !this.isValidDate(v);
+    if (field === 'email') return !this.isValidEmail(v);
+    if (field === 'id_number') return !this.isValidIdNumber(raw);
+    return false;
+  }
+
+  private isRowValid(row: MemberRow): boolean {
+    return (
+      !this.isInvalid(row, 'name') &&
+      !this.isInvalid(row, 'id_number') &&
+      !this.isInvalid(row, 'date') &&
+      !this.isInvalid(row, 'email')
+    );
   }
 
   protected readonly outputFolder = computed(() => {
@@ -205,7 +300,10 @@ export class App {
     try {
       const cfg = await firstValueFrom(this.http.get<ConfigOut>(`${this.apiBase}/config`));
       const v = (cfg?.output_dir ?? '').toString().trim();
-      if (v) this.outputDir.set(v);
+      if (v) {
+        this.outputDir.set(v);
+        this.outputDefaultEnabled.set(true);
+      }
     } catch {
       // ignore; API may not be up yet
     }
@@ -272,6 +370,38 @@ export class App {
 
   protected onOutputDirChange(value: string): void {
     this.outputDir.set(value ?? '');
+  }
+
+  protected async setDefaultOutputDir(enabled: boolean): Promise<void> {
+    const current = this.outputDir().trim();
+    if (enabled) {
+      if (!current) {
+        this.error.set('Choose an output folder first.');
+        this.outputDefaultEnabled.set(false);
+        return;
+      }
+      try {
+        await firstValueFrom(
+          this.http.put<OutputSettingsOut>(`${this.apiBase}/settings/output`, { output_dir: current })
+        );
+        this.outputDefaultEnabled.set(true);
+      } catch (e: any) {
+        const msg = e?.error?.detail || e?.message || 'Failed to save output folder default.';
+        this.error.set(String(msg));
+        this.outputDefaultEnabled.set(false);
+      }
+      return;
+    }
+
+    try {
+      await firstValueFrom(
+        this.http.put<OutputSettingsOut>(`${this.apiBase}/settings/output`, { output_dir: null })
+      );
+      this.outputDefaultEnabled.set(false);
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to clear output folder default.';
+      this.error.set(String(msg));
+    }
   }
 
   protected async chooseOutputDir(): Promise<void> {
@@ -451,7 +581,7 @@ export class App {
       const incoming = Array.isArray(resp.members) ? resp.members : [];
       const incomingRows: MemberRow[] = incoming.map((m) => ({
         name: m.name ?? '',
-        id_number: m.id_number ?? '',
+        id_number: this.normalizeIdNumber(m.id_number ?? ''),
         date: m.date ?? '',
         email: m.email ?? '',
         selected: true,
@@ -542,7 +672,8 @@ export class App {
 
     const nextRows = rows.slice();
     const row = { ...nextRows[index] };
-    row[field] = value ?? '';
+    if (field === 'id_number') row[field] = this.normalizeIdNumber(value ?? '');
+    else row[field] = value ?? '';
     nextRows[index] = row;
     this.members.set(nextRows);
 
@@ -792,6 +923,8 @@ export class App {
 
       this.emailActive.set(s.active ?? 'microsoft');
       this.emailDefaults.set(s.defaults ?? null);
+      this.unionMgmtEnabled.set(!!s.union_management?.enabled);
+      this.unionMgmtEmail.set((s.union_management?.email ?? '').toString());
 
       this.msEmail.set((s.microsoft?.email ?? '').toString());
       this.msPassword.set((s.microsoft?.password ?? '').toString());
@@ -833,6 +966,10 @@ export class App {
           subject_tpl: this.gmailSubjectTpl(),
           body_tpl: this.gmailBodyTpl(),
         },
+        union_management: {
+          enabled: !!this.unionMgmtEnabled(),
+          email: this.unionMgmtEmail().trim(),
+        },
         defaults: this.emailDefaults() ?? ({} as any),
       };
 
@@ -872,7 +1009,12 @@ export class App {
   protected canSendWithActiveSettings(): boolean {
     const emailAddr = this.currentEmail().trim();
     const password = this.currentPassword();
-    return !!emailAddr && !!password;
+    if (!emailAddr || !password) return false;
+    if (this.unionMgmtEnabled()) {
+      const cc = this.unionMgmtEmail().trim();
+      if (!cc || !this.isValidEmail(cc)) return false;
+    }
+    return true;
   }
 
   protected async sendPendingFromModal(): Promise<void> {
@@ -952,8 +1094,8 @@ export class App {
       this.pendingSend.set(null);
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to send email.';
-      this.error.set(String(msg));
-      this.emailStatus.set(String(msg));
+      this.error.set(null);
+      this.emailStatus.set(this.friendlyEmailFailureMessage(String(msg)));
     } finally {
       this.isEmailing.set(false);
       this.isLoading.set(false);
@@ -1038,8 +1180,8 @@ export class App {
       this.pendingSend.set(null);
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to send email.';
-      this.error.set(String(msg));
-      this.emailStatus.set(String(msg));
+      this.error.set(null);
+      this.emailStatus.set(this.friendlyEmailFailureMessage(String(msg)));
     } finally {
       this.isEmailing.set(false);
       this.isLoading.set(false);
