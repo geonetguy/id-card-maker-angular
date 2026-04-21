@@ -18,6 +18,7 @@ import base64
 import io
 import json
 import os
+import sys
 import uuid
 from pathlib import Path
 from typing import Callable
@@ -172,6 +173,10 @@ class ChooseOutputDirOut(BaseModel):
 class AssetSettings(BaseModel):
     template_path: Optional[str] = None
     signature_path: Optional[str] = None
+    # Optional: store defaults directly as base64 so the web UI can persist
+    # selections made via <input type="file"> (which doesn't expose a full path).
+    template_base64: Optional[str] = None
+    signature_base64: Optional[str] = None
 
 
 class ChooseAssetIn(BaseModel):
@@ -230,12 +235,33 @@ def _settings_path() -> Path:
 
     In the packaged app, this is injected by the Toga shell via
     `IDCARD_SETTINGS_PATH`. In development, it falls back to a file in the
-    project root.
+    user config directory.
     """
     override = (os.environ.get("IDCARD_SETTINGS_PATH") or "").strip()
     if override:
         return Path(override).expanduser()
-    return Path(__file__).resolve().parents[1] / "idcard_settings.json"
+    return get_default_settings_path()
+
+
+def get_default_settings_path() -> Path:
+    """
+    Stable default settings location across run modes.
+
+    This avoids having different settings files depending on whether you run
+    via Briefcase/Toga or run the API directly via uvicorn.
+    """
+    if sys.platform.startswith("win"):
+        base = (os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or "").strip()
+        if base:
+            return Path(base) / "ID Card Maker" / "settings.json"
+        return Path.home() / "AppData" / "Local" / "ID Card Maker" / "settings.json"
+
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "ID Card Maker" / "settings.json"
+
+    xdg = (os.environ.get("XDG_CONFIG_HOME") or "").strip()
+    base = Path(xdg) if xdg else (Path.home() / ".config")
+    return base / "idcard_maker" / "settings.json"
 
 
 def _read_settings_json() -> dict:
@@ -334,6 +360,15 @@ class OpenPathIn(BaseModel):
 
 class OpenPathOut(BaseModel):
     ok: bool
+
+
+class ClearCardsIn(BaseModel):
+    output_dir: Optional[str] = None
+
+
+class ClearCardsOut(BaseModel):
+    output_dir: str
+    deleted: int
 
 
 class SMTPConfigIn(BaseModel):
@@ -468,8 +503,8 @@ def asset_defaults() -> AssetDefaultsOut:
         except Exception:
             return None
 
-    out.template_base64 = try_load(settings.template_path)
-    out.signature_base64 = try_load(settings.signature_path)
+    out.template_base64 = (settings.template_base64 or "").strip() or try_load(settings.template_path)
+    out.signature_base64 = (settings.signature_base64 or "").strip() or try_load(settings.signature_path)
     return out
 
 
@@ -504,6 +539,36 @@ def preview(body: PreviewIn) -> PreviewOut:
         raise HTTPException(status_code=500, detail="internal_error") from e
 
 
+def _require_all_member_fields(m: MemberIn | MemberLooseIn, *, index: Optional[int] = None) -> dict[str, str]:
+    """
+    Enforce that all member fields are present.
+
+    Returns a normalized dict with a normalized date (YYYY-MM-DD).
+    Raises 400 if anything is missing/invalid.
+    """
+    prefix = f"member[{index}]." if index is not None else "member."
+
+    name = (getattr(m, "name", "") or "").strip()
+    idnum = (getattr(m, "id_number", "") or "").strip()
+    date_raw = (getattr(m, "date", "") or "").strip()
+    email = (getattr(m, "email", "") or "").strip()
+
+    if not name:
+        raise HTTPException(status_code=400, detail=f"{prefix}name is required")
+    if not idnum:
+        raise HTTPException(status_code=400, detail=f"{prefix}id_number is required")
+    if not date_raw:
+        raise HTTPException(status_code=400, detail=f"{prefix}date is required")
+    if not email:
+        raise HTTPException(status_code=400, detail=f"{prefix}email is required")
+
+    date_norm = _normalize_date(date_raw)
+    if not date_norm:
+        raise HTTPException(status_code=400, detail=f"{prefix}date is invalid (expected YYYY-MM-DD or a common format)")
+
+    return {"name": name, "id_number": idnum, "date": date_norm, "email": email}
+
+
 @app.post("/generate", response_model=GenerateOut)
 def generate(body: GenerateIn) -> GenerateOut:
     """
@@ -515,20 +580,18 @@ def generate(body: GenerateIn) -> GenerateOut:
     - if file exists, uses next_available() to avoid overwriting
     """
     try:
-        idnum = (body.member.id_number or "").strip()
-        if not idnum:
-            raise HTTPException(status_code=400, detail="member.id_number is required")
+        member = _require_all_member_fields(body.member)
+        idnum = member["id_number"]
 
         template = _pil_image_from_base64(body.template_base64).convert("RGBA")
         signature: Optional[Image.Image] = None
         if body.signature_base64:
             signature = _pil_image_from_base64(body.signature_base64).convert("RGBA")
 
-        date_norm = _normalize_date(body.member.date or "")
         canvas = generate_single_card(
-            name=(body.member.name or "").strip(),
+            name=member["name"],
             id_number=idnum,
-            date=(date_norm or ""),
+            date=member["date"],
             template=template,
             signature=signature,
             font_path=_DEFAULT_FONT_PATH,
@@ -610,6 +673,50 @@ def open_path(body: OpenPathIn) -> OpenPathOut:
         raise HTTPException(status_code=500, detail="internal_error")
 
 
+@app.post("/clear-cards", response_model=ClearCardsOut)
+def clear_cards(body: ClearCardsIn) -> ClearCardsOut:
+    """
+    Delete generated card images in the output directory.
+
+    Safety: deletes only *.png files (recursively) under output_dir (or default output dir).
+    """
+    out_dir = Path(body.output_dir).expanduser() if body.output_dir else _default_output_dir()
+    try:
+        out_dir = out_dir.resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid_output_dir")
+
+    if out_dir.exists() and not out_dir.is_dir():
+        raise HTTPException(status_code=400, detail="output_dir_is_not_a_directory")
+
+    if not out_dir.exists():
+        return ClearCardsOut(output_dir=str(out_dir), deleted=0)
+
+    try:
+        deleted = 0
+        for p in out_dir.rglob("*.png"):
+            try:
+                if p.is_file() or p.is_symlink():
+                    p.unlink(missing_ok=True)
+                    deleted += 1
+            except Exception:
+                # Best-effort: keep clearing other files.
+                pass
+
+        # Best-effort: remove empty directories left behind.
+        for d in sorted((p for p in out_dir.rglob("*") if p.is_dir()), key=lambda x: len(str(x)), reverse=True):
+            try:
+                d.rmdir()
+            except Exception:
+                pass
+
+        return ClearCardsOut(output_dir=str(out_dir), deleted=deleted)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="internal_error") from e
+
+
 @app.post("/generate-batch", response_model=GenerateBatchOut)
 async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
     """
@@ -629,15 +736,9 @@ async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         rows: list[dict[str, str]] = []
-        for m in body.members:
-            rows.append(
-                {
-                    "name": (m.name or "").strip(),
-                    "id_number": (m.id_number or "").strip(),
-                    "date": _normalize_date(m.date or ""),
-                    "email": (m.email or "").strip(),
-                }
-            )
+        for idx, m in enumerate(body.members, start=1):
+            member = _require_all_member_fields(m, index=idx)
+            rows.append(member)
 
         ok = skipped = errors = 0
         results: list[GenerateBatchResult] = []
@@ -658,6 +759,8 @@ async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
             output_dir=str(out_dir),
             results=results,
         )
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
@@ -767,6 +870,19 @@ async def email(body: EmailIn) -> EmailOut:
     if not (cfg.host or "").strip() or not (cfg.from_email or "").strip():
         raise HTTPException(status_code=400, detail="smtp.host and smtp.from_email are required")
 
+    # Validate members up-front (require all fields) so we don't partially send.
+    members_valid: list[MemberLooseIn] = []
+    for idx, m in enumerate(body.members, start=1):
+        mv = _require_all_member_fields(m, index=idx)
+        members_valid.append(
+            MemberLooseIn(
+                name=mv["name"],
+                id_number=mv["id_number"],
+                date=mv["date"],
+                email=mv["email"],
+            )
+        )
+
     template: Optional[Image.Image] = None
     signature: Optional[Image.Image] = None
     if body.template_base64:
@@ -795,14 +911,10 @@ async def email(body: EmailIn) -> EmailOut:
 
     try:
         with Mailer(cfg) as mailer:
-            for i, m in enumerate(body.members, start=1):
+            for i, m in enumerate(members_valid, start=1):
                 try:
                     idnum = (m.id_number or "").strip()
                     to_email = (m.email or "").strip()
-                    if not idnum or not to_email:
-                        skipped += 1
-                        results.append(EmailResult(index=i, result="skipped", message="missing id_number or email"))
-                        continue
 
                     attach = attachment_path_for_id(idnum, out_dir=out_dir)
                     if not attach.exists():
@@ -811,11 +923,10 @@ async def email(body: EmailIn) -> EmailOut:
                             skipped += 1
                             results.append(EmailResult(index=i, result="skipped", message="missing attachment and no template provided"))
                             continue
-                        date_norm = _normalize_date(m.date or "")
                         canvas = generate_single_card(
                             name=(m.name or "").strip(),
                             id_number=idnum,
-                            date=(date_norm or ""),
+                            date=(m.date or "").strip(),
                             template=template,
                             signature=signature,
                             font_path=_DEFAULT_FONT_PATH,

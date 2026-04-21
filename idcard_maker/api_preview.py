@@ -59,6 +59,19 @@ def _normalize_date(s: str) -> str:
     s = (s or "").strip()
     if not s:
         return ""
+
+    # Be tolerant of “dash-like” characters that commonly show up when copying
+    # from office apps (en dash, non-breaking hyphen, minus sign, etc.).
+    s = s.translate(
+        {
+            ord("\u2010"): "-",
+            ord("\u2011"): "-",
+            ord("\u2012"): "-",
+            ord("\u2013"): "-",
+            ord("\u2014"): "-",
+            ord("\u2212"): "-",
+        }
+    ).strip()
     fmts = [
         "%Y-%m-%d",
         "%Y/%m/%d",

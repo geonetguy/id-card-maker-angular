@@ -31,11 +31,18 @@ type AssetDefaultsOut = {
   template_base64?: string | null;
   signature_base64?: string | null;
 };
+type AssetSettingsOut = {
+  template_path?: string | null;
+  signature_path?: string | null;
+  template_base64?: string | null;
+  signature_base64?: string | null;
+};
 type ChooseAssetOut = { kind: 'template' | 'signature'; path?: string | null; base64?: string | null };
 type OpenPathOut = { ok: boolean };
 type EmailResult = { index: number; result: 'sent' | 'skipped' | 'error'; message?: string | null };
 type EmailOut = { total: number; sent: number; skipped: number; errors: number; results: EmailResult[] };
 type EmailProvider = 'microsoft' | 'gmail';
+type OfficerRole = 'President' | 'Vice President' | 'Membership Officer';
 type EmailAccountSettings = {
   email: string;
   password: string;
@@ -58,6 +65,7 @@ type EmailSettingsV2 = {
   gmail: EmailAccountSettings;
   defaults: Record<EmailProvider, EmailProviderDefaults>;
 };
+type ClearCardsOut = { output_dir: string; deleted: number };
 
 @Component({
   selector: 'app-root',
@@ -122,6 +130,9 @@ export class App {
   protected readonly settingsStatus = signal<string | null>(null);
   protected readonly isSavingSettings = signal(false);
 
+  protected readonly clearConfirm = signal(false);
+  private clearConfirmTimer: number | null = null;
+
   protected readonly hasTemplate = computed(() => !!this.templateBase64());
   protected readonly hasSignature = computed(() => !!this.signatureBase64());
   protected readonly assetsReady = computed(() => this.hasTemplate());
@@ -146,6 +157,29 @@ export class App {
     const chosen = this.selectAll() ? rows : rows.filter((r) => r.selected);
     return chosen.map(({ name, id_number, date, email }) => ({ name, id_number, date, email }));
   });
+
+  protected readonly selectedRowsComplete = computed(() => {
+    const rows = this.members();
+    const chosen = this.selectAll() ? rows : rows.filter((r) => r.selected);
+    if (!chosen.length) return false;
+    return chosen.every((m) => {
+      return (
+        (m.name || '').trim().length > 0 &&
+        (m.id_number || '').trim().length > 0 &&
+        (m.date || '').trim().length > 0 &&
+        (m.email || '').trim().length > 0
+      );
+    });
+  });
+
+  protected isWorkSelected(row: MemberRow): boolean {
+    return this.selectAll() || !!row.selected;
+  }
+
+  protected isMissing(row: MemberRow, field: keyof Member): boolean {
+    const v = (row[field] ?? '').toString().trim();
+    return v.length === 0;
+  }
 
   protected readonly outputFolder = computed(() => {
     const direct = this.outputDir().trim();
@@ -192,8 +226,8 @@ export class App {
 
       this.templatePath.set(tplPath || null);
       this.signaturePath.set(sigPath || null);
-      this.templateDefaultEnabled.set(!!tplPath);
-      this.signatureDefaultEnabled.set(!!sigPath);
+      this.templateDefaultEnabled.set(!!(tplPath || tplB64));
+      this.signatureDefaultEnabled.set(!!(sigPath || sigB64));
       if (tplB64) this.templateBase64.set(tplB64);
       if (sigB64) this.signatureBase64.set(sigB64);
 
@@ -304,9 +338,12 @@ export class App {
       }
 
       await firstValueFrom(
-        this.http.put(`${this.apiBase}/settings/assets`, {
+        this.http.put<AssetSettingsOut>(`${this.apiBase}/settings/assets`, {
           template_path: this.templatePath(),
           signature_path: this.signaturePath(),
+          // When persisting by path, do not bloat settings with base64.
+          template_base64: null,
+          signature_base64: null,
         })
       );
 
@@ -319,11 +356,48 @@ export class App {
 
   protected async setDefaultAsset(kind: 'template' | 'signature', enabled: boolean): Promise<void> {
     if (enabled) {
-      const before =
-        kind === 'template' ? this.templatePath() : this.signaturePath();
+      // Prefer persisting the currently-loaded in-memory base64 (from Choose file…).
+      const b64 = kind === 'template' ? this.templateBase64() : this.signatureBase64();
+      if (b64 && b64.trim()) {
+        // Preserve the other asset default (path-based or base64-based) as-is.
+        const currentTemplatePath = this.templatePath();
+        const currentSignaturePath = this.signaturePath();
+        const currentTemplateB64 =
+          this.templateDefaultEnabled() && !currentTemplatePath ? (this.templateBase64() || '').trim() : '';
+        const currentSignatureB64 =
+          this.signatureDefaultEnabled() && !currentSignaturePath ? (this.signatureBase64() || '').trim() : '';
+
+        if (kind === 'template') {
+          this.templatePath.set(null);
+          this.templateDefaultEnabled.set(true);
+        } else {
+          this.signaturePath.set(null);
+          this.signatureDefaultEnabled.set(true);
+        }
+
+        try {
+          const payload: AssetSettingsOut = {
+            template_path: kind === 'template' ? null : currentTemplatePath,
+            signature_path: kind === 'signature' ? null : currentSignaturePath,
+            template_base64: kind === 'template' ? b64 : (currentTemplatePath ? null : (currentTemplateB64 || null)),
+            signature_base64: kind === 'signature' ? b64 : (currentSignaturePath ? null : (currentSignatureB64 || null)),
+          };
+          await firstValueFrom(this.http.put<AssetSettingsOut>(`${this.apiBase}/settings/assets`, payload));
+          this.schedulePreview();
+          return;
+        } catch (e: any) {
+          const msg = e?.error?.detail || e?.message || 'Failed to save default setting.';
+          this.error.set(String(msg));
+          if (kind === 'template') this.templateDefaultEnabled.set(false);
+          else this.signatureDefaultEnabled.set(false);
+          return;
+        }
+      }
+
+      // Fallback: if nothing is loaded yet, ask the backend to pick an on-disk file.
+      const before = kind === 'template' ? this.templatePath() : this.signaturePath();
       await this.chooseDefaultAsset(kind);
-      const after =
-        kind === 'template' ? this.templatePath() : this.signaturePath();
+      const after = kind === 'template' ? this.templatePath() : this.signaturePath();
       const ok = !!after && after !== before;
       if (!ok) {
         if (kind === 'template') this.templateDefaultEnabled.set(!!before);
@@ -333,6 +407,13 @@ export class App {
     }
 
     // Disable default (but keep currently-loaded in-memory base64 if present)
+    const currentTemplatePath = this.templatePath();
+    const currentSignaturePath = this.signaturePath();
+    const currentTemplateB64 =
+      this.templateDefaultEnabled() && !currentTemplatePath ? (this.templateBase64() || '').trim() : '';
+    const currentSignatureB64 =
+      this.signatureDefaultEnabled() && !currentSignaturePath ? (this.signatureBase64() || '').trim() : '';
+
     if (kind === 'template') {
       this.templatePath.set(null);
       this.templateDefaultEnabled.set(false);
@@ -343,9 +424,11 @@ export class App {
 
     try {
       await firstValueFrom(
-        this.http.put(`${this.apiBase}/settings/assets`, {
-          template_path: this.templatePath(),
-          signature_path: this.signaturePath(),
+        this.http.put<AssetSettingsOut>(`${this.apiBase}/settings/assets`, {
+          template_path: kind === 'template' ? null : currentTemplatePath,
+          signature_path: kind === 'signature' ? null : currentSignaturePath,
+          template_base64: kind === 'template' ? null : (currentTemplatePath ? null : (currentTemplateB64 || null)),
+          signature_base64: kind === 'signature' ? null : (currentSignaturePath ? null : (currentSignatureB64 || null)),
         })
       );
     } catch (e: any) {
@@ -354,7 +437,7 @@ export class App {
     }
   }
 
-  protected async onUploadCsv(file: File | null): Promise<void> {
+  protected async onUploadCsv(inputEl: HTMLInputElement, file: File | null): Promise<void> {
     if (!file) return;
     this.error.set(null);
     this.batchStatus.set(null);
@@ -371,14 +454,20 @@ export class App {
         id_number: m.id_number ?? '',
         date: m.date ?? '',
         email: m.email ?? '',
-        selected: this.selectAll(),
+        selected: true,
       }));
-      const merged = [...this.members(), ...incomingRows];
+      const merged = [...this.members(), ...incomingRows].map((r) => ({ ...r, selected: true }));
+      this.selectAll.set(true);
       this.members.set(merged);
       this.batchStatus.set(`Loaded ${incoming.length} member(s) from ${file.name}.`);
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to upload CSV.';
       this.error.set(String(msg));
+    } finally {
+      // Allow selecting the same file again (some browsers won't fire change otherwise).
+      try {
+        inputEl.value = '';
+      } catch {}
     }
   }
 
@@ -508,6 +597,12 @@ export class App {
       return;
     }
 
+    const outDir = this.outputDir().trim();
+    if (!outDir) {
+      this.error.set('Choose an output folder first.');
+      return;
+    }
+
     const chosen = this.selectedMembers();
     if (!chosen.length) {
       this.error.set('No members selected.');
@@ -521,16 +616,16 @@ export class App {
         members: chosen,
         template_base64: template,
         signature_base64: this.signatureBase64(),
-        output_dir: this.outputDir().trim() || null,
+        output_dir: outDir,
       };
 
       const resp = await firstValueFrom(
         this.http.post<GenerateBatchOut>(`${this.apiBase}/generate-batch`, payload)
       );
       this.batchResult.set(resp);
-      const outDir = resp.output_dir ? ` Saved to: ${resp.output_dir}` : '';
+      const outDirMsg = resp.output_dir ? ` Saved to: ${resp.output_dir}` : '';
       this.batchStatus.set(
-        `Batch complete: ${resp.ok} saved, ${resp.skipped} skipped, ${resp.errors} errors.${outDir}`
+        `Batch complete: ${resp.ok} saved, ${resp.skipped} skipped, ${resp.errors} errors.${outDirMsg}`
       );
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to generate batch.';
@@ -753,6 +848,27 @@ export class App {
     }
   }
 
+  protected applyQuickSender(role: OfficerRole): void {
+    const OFFICER_EMAILS: Record<OfficerRole, string> = {
+      President: 'president@cupe3523.ca',
+      'Vice President': 'vice.president@cupe3523.ca',
+      'Membership Officer': 'membership.officer@cupe3523.ca',
+    };
+
+    const addr = (OFFICER_EMAILS[role] || '').trim();
+    if (!addr) return;
+
+    this.settingsStatus.set(`Applied ${role}.`);
+
+    if (this.emailActive() === 'microsoft') {
+      this.msEmail.set(addr);
+      this.msFromName.set(role);
+    } else {
+      this.gmailEmail.set(addr);
+      this.gmailFromName.set(role);
+    }
+  }
+
   protected canSendWithActiveSettings(): boolean {
     const emailAddr = this.currentEmail().trim();
     const password = this.currentPassword();
@@ -774,6 +890,12 @@ export class App {
     this.error.set(null);
     this.emailStatus.set(null);
     this.emailResult.set(null);
+
+    const outDir = this.outputDir().trim();
+    if (!outDir) {
+      this.error.set('Choose an output folder first.');
+      return;
+    }
 
     const chosen = this.selectedMembers();
     if (!chosen.length) {
@@ -821,7 +943,7 @@ export class App {
         body_tpl: this.currentBodyTpl(),
         template_base64: this.templateBase64(),
         signature_base64: this.signatureBase64(),
-        output_dir: this.outputDir().trim() || null,
+        output_dir: outDir,
       };
 
       const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
@@ -842,6 +964,12 @@ export class App {
     this.error.set(null);
     this.emailStatus.set(null);
     this.emailResult.set(null);
+
+    const outDir = this.outputDir().trim();
+    if (!outDir) {
+      this.error.set('Choose an output folder first.');
+      return;
+    }
 
     const idnum = this.idNumber().trim();
     const toEmail = this.email().trim();
@@ -901,7 +1029,7 @@ export class App {
         body_tpl: this.currentBodyTpl(),
         template_base64: this.templateBase64(),
         signature_base64: this.signatureBase64(),
-        output_dir: this.outputDir().trim() || null,
+        output_dir: outDir,
       };
 
       const resp = await firstValueFrom(this.http.post<EmailOut>(`${this.apiBase}/email`, payload));
@@ -993,5 +1121,63 @@ export class App {
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  protected async clearCards(): Promise<void> {
+    this.error.set(null);
+    this.batchStatus.set(null);
+
+    if (!this.clearConfirm()) {
+      this.clearConfirm.set(true);
+      this.batchStatus.set('Ready to delete all generated cards. Click Clear cards again to confirm (6s).');
+      if (this.clearConfirmTimer !== null) window.clearTimeout(this.clearConfirmTimer);
+      this.clearConfirmTimer = window.setTimeout(() => {
+        this.clearConfirm.set(false);
+        this.batchStatus.set('Clear cancelled.');
+      }, 6000);
+      return;
+    }
+
+    if (this.clearConfirmTimer !== null) {
+      window.clearTimeout(this.clearConfirmTimer);
+      this.clearConfirmTimer = null;
+    }
+    this.clearConfirm.set(false);
+
+    this.isLoading.set(true);
+    try {
+      const outputDir = this.outputDir().trim();
+      if (!outputDir) {
+        this.error.set('Choose an output folder first.');
+        this.batchStatus.set('Choose an output folder first.');
+        return;
+      }
+      const resp = await firstValueFrom(
+        this.http.post<ClearCardsOut>(`${this.apiBase}/clear-cards`, { output_dir: outputDir })
+      );
+
+      // Reset UI state (keep template/signature + output dir settings).
+      this.members.set([]);
+      this.selectAll.set(false);
+      this.selectedIndex.set(null);
+      this.name.set('');
+      this.idNumber.set('');
+      this.date.set('');
+      this.email.set('');
+      this.batchResult.set(null);
+      this.emailResult.set(null);
+      this.emailStatus.set(null);
+      this.warning.set(null);
+      this.previewPngBase64.set(null);
+
+      this.batchStatus.set(`Cleared ${resp.deleted} card(s).`);
+      this.schedulePreview();
+    } catch (e: any) {
+      const msg = e?.error?.detail || e?.message || 'Failed to clear cards.';
+      this.error.set(String(msg));
+      this.batchStatus.set(String(msg));
+    } finally {
+      this.isLoading.set(false);
+    }
   }
 }

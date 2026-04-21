@@ -1,7 +1,6 @@
 <div class="app">
   <header class="header">
     <div class="header__title">ID Card Maker</div>
-    <div class="header__hint">Step D3: Angular UI + Python backend.</div>
     <div class="header__menu">
       <div class="pill">Active email: {{ emailActive() === 'microsoft' ? 'Microsoft' : 'Gmail' }}</div>
       <button class="btn btn--secondary" (click)="openSettings()">Email settings</button>
@@ -77,7 +76,7 @@
             class="fileInput"
             type="file"
             accept=".csv,text/csv"
-            (change)="onUploadCsv($any($event.target).files?.item(0) ?? null)"
+            (change)="onUploadCsv(csvFile, $any($event.target).files?.item(0) ?? null)"
           />
           <button class="btn btn--secondary" (click)="csvFile.click()" [disabled]="isLoading()">
             Choose file…
@@ -86,7 +85,7 @@
       </div>
 
       <div class="field">
-        <label class="label">Output folder (optional)</label>
+        <label class="label">Output folder (required)</label>
         <div class="row">
           <input
             class="input"
@@ -98,6 +97,7 @@
             Choose…
           </button>
         </div>
+        <div class="hint">Generate and email actions require an output folder.</div>
       </div>
 
       <div class="callouts" *ngIf="error() || warning()">
@@ -112,10 +112,6 @@
         </div>
       </div>
 
-      <div class="note">
-        Start API:
-        <code>py -3.13 -m uvicorn idcard_maker.api_app:app --host 127.0.0.1 --port 8000</code>
-      </div>
     </section>
 
     <div class="rightCol">
@@ -135,15 +131,32 @@
         <div class="tableToolbar">
           <div class="actions">
             <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading()">Add member</button>
-            <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || selectedCount() === 0">Generate card(s)</button>
-            <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || selectedCount() === 0">Email card(s)</button>
+            <button class="btn" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Generate card(s)</button>
+            <button class="btn" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Email card(s)</button>
             <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()">Open folder</button>
             <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0">Export CSV</button>
+            <button class="btn btn--danger" (click)="clearCards()" [disabled]="isLoading()">
+              {{ clearConfirm() ? 'Click again to confirm (6s)' : 'Clear cards' }}
+            </button>
           </div>
 
-          <div class="statusStack" *ngIf="emailStatus() || batchStatus()">
+          <div
+            class="statusStack"
+            *ngIf="
+              emailStatus() ||
+              batchStatus() ||
+              (!hasOutputFolder()) ||
+              (selectedCount() > 0 && !selectedRowsComplete())
+            "
+          >
             <div class="status" *ngIf="emailStatus()">Email: {{ emailStatus() }}</div>
             <div class="status" *ngIf="batchStatus()">Batch: {{ batchStatus() }}</div>
+            <div class="status status--req" *ngIf="!hasOutputFolder()">
+              Required: choose an <strong>Output folder</strong> before generating or emailing cards.
+            </div>
+            <div class="status status--req" *ngIf="selectedCount() > 0 && !selectedRowsComplete()">
+              Required: fill <strong>Name</strong>, <strong>ID Number</strong>, <strong>Date</strong>, and <strong>Email</strong> for all selected rows.
+            </div>
           </div>
 
           <div class="batchSummary" *ngIf="emailResult()">
@@ -175,10 +188,10 @@
                     />
                   </label>
                 </th>
-                <th>Name</th>
-                <th>ID Number</th>
-                <th>Date</th>
-                <th>Email</th>
+                <th>Name <span class="reqMark" aria-hidden="true">*</span></th>
+                <th>ID Number <span class="reqMark" aria-hidden="true">*</span></th>
+                <th>Date <span class="reqMark" aria-hidden="true">*</span></th>
+                <th>Email <span class="reqMark" aria-hidden="true">*</span></th>
                 <th class="colActions"></th>
               </tr>
             </thead>
@@ -203,33 +216,33 @@
                     <td>
                       <input
                         class="tableCellInput"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'name')"
                         [value]="m.name"
-                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'name', $any($event.target).value)"
                       />
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'id_number')"
                         [value]="m.id_number"
-                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'id_number', $any($event.target).value)"
                       />
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'date')"
                         placeholder="YYYY-MM-DD"
                         [value]="m.date"
-                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'date', $any($event.target).value)"
                       />
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
+                        [class.tableCellInput--invalid]="isWorkSelected(m) && isMissing(m, 'email')"
                         [value]="m.email"
-                        (click)="$event.stopPropagation()"
                         (input)="updateRowField($index, 'email', $any($event.target).value)"
                       />
                     </td>
@@ -294,6 +307,21 @@
         </div>
 
         <div class="field">
+          <label class="label">Quick sender</label>
+          <div class="row row--wrap">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('President')" [disabled]="isSavingSettings()">
+              President
+            </button>
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Vice President')" [disabled]="isSavingSettings()">
+              Vice President
+            </button>
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Membership Officer')" [disabled]="isSavingSettings()">
+              Membership Officer
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
           <label class="label">Email</label>
           <input class="input" [value]="msEmail()" (input)="msEmail.set($any($event.target).value)" placeholder="you@domain.com" />
         </div>
@@ -334,6 +362,21 @@
         <div class="hint">
           SMTP: {{ emailDefaults()?.gmail?.smtp_server }}:{{ emailDefaults()?.gmail?.smtp_port }} ({{ emailDefaults()?.gmail?.smtp_encryption }})<br />
           IMAP: {{ emailDefaults()?.gmail?.imap_server }}:{{ emailDefaults()?.gmail?.imap_port }} ({{ emailDefaults()?.gmail?.imap_encryption }})
+        </div>
+
+        <div class="field">
+          <label class="label">Quick sender</label>
+          <div class="row row--wrap">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('President')" [disabled]="isSavingSettings()">
+              President
+            </button>
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Vice President')" [disabled]="isSavingSettings()">
+              Vice President
+            </button>
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Membership Officer')" [disabled]="isSavingSettings()">
+              Membership Officer
+            </button>
+          </div>
         </div>
 
         <div class="field">

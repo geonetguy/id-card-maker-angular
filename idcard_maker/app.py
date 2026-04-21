@@ -16,7 +16,7 @@ from functools import partial
 
 import toga
 
-from .api_app import app as api_app
+from .api_app import app as api_app, get_default_settings_path
 from .api_app import set_choose_output_dir_callback
 from .api_app import set_choose_asset_callback
 from .constants import APP_TITLE
@@ -325,7 +325,7 @@ class IDCardApp(toga.App):
         # Persist settings to a stable per-user location (so WebView origin changes
         # don't affect storage).
         try:
-            settings_path = Path(self.paths.app_data) / "settings.json"
+            settings_path = get_default_settings_path()
             settings_path.parent.mkdir(parents=True, exist_ok=True)
             os.environ["IDCARD_SETTINGS_PATH"] = str(settings_path)
         except Exception:

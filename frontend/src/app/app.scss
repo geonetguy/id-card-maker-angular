@@ -107,6 +107,10 @@
   align-items: center;
 }
 
+.row--wrap {
+  flex-wrap: wrap;
+}
+
 .row .input {
   flex: 1;
 }
@@ -143,7 +147,8 @@
 }
 
 .label {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--uip-text-muted);
 }
 
@@ -173,7 +178,7 @@
 
 .hint {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
   color: var(--uip-text-muted);
 }
@@ -280,13 +285,29 @@
   color: var(--uip-text-muted);
 }
 
+.btn--danger {
+  background: var(--uip-danger);
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  color: #ffffff;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn--chip {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
 .status {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--uip-text-muted);
 }
 
@@ -313,6 +334,23 @@
   background: var(--uip-warning-soft);
   border: 1px solid rgba(234, 179, 8, 0.22);
   color: #7a5b00;
+}
+
+/* legacy: required hints were previously rendered as .hint; now they live in .statusStack */
+.hint--req {
+  margin-top: 10px;
+  color: var(--uip-text-muted);
+}
+
+.reqMark {
+  color: var(--uip-danger);
+  font-weight: 900;
+}
+
+.tableCellInput--invalid {
+  border-color: rgba(220, 38, 38, 0.7);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  background: rgba(220, 38, 38, 0.06);
 }
 
 .note {
@@ -356,8 +394,22 @@
 
 .statusStack {
   display: grid;
-  gap: 4px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--uip-radius-lg);
+  border: 1px solid var(--uip-border);
+  background: var(--uip-surface-alt);
+}
+
+.statusStack .status {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--uip-text);
+}
+
+.statusStack .status--req {
+  color: #7a5b00;
 }
 
 .tableToolbar {
@@ -481,7 +533,7 @@
 }
 
 .batchSummary__line {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--uip-text-muted);
 }
 

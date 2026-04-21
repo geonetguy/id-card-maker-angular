@@ -64,6 +64,27 @@ def test_asset_settings_roundtrip(client: TestClient) -> None:
             pass
 
 
+def test_asset_settings_can_persist_base64_defaults(client: TestClient) -> None:
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-assets-b64-{uuid.uuid4().hex}"
+    td.mkdir(parents=True, exist_ok=True)
+    try:
+        os.environ["IDCARD_SETTINGS_PATH"] = str(td / "settings.json")
+        b64 = _png_b64()
+
+        r = client.put("/settings/assets", json={"template_base64": b64, "signature_base64": None})
+        assert r.status_code == 200
+
+        r2 = client.get("/assets/defaults")
+        assert r2.status_code == 200
+        data = r2.json()
+        assert (data.get("template_base64") or "") == b64
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
+
+
 def test_email_settings_roundtrip(client: TestClient) -> None:
     td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-settings-{uuid.uuid4().hex}"
     td.mkdir(parents=True, exist_ok=True)
@@ -122,6 +143,7 @@ def test_upload_csv_parses_and_normalizes(client: TestClient) -> None:
     csv_bytes = (
         "Name,ID Number,Date,Email\n"
         "Alice,1001,04/19/2026,alice@example.com\n"
+        "Dash,1003,2026\u201104\u201120,dash@example.com\n"
         "Bob,1002,not-a-date,bob@example.com\n"
     ).encode("utf-8")
 
@@ -133,8 +155,10 @@ def test_upload_csv_parses_and_normalizes(client: TestClient) -> None:
     members = r.json()["members"]
     assert members[0]["id_number"] == "1001"
     assert members[0]["date"] == "2026-04-19"
-    assert members[1]["id_number"] == "1002"
-    assert members[1]["date"] == ""
+    assert members[1]["id_number"] == "1003"
+    assert members[1]["date"] == "2026-04-20"
+    assert members[2]["id_number"] == "1002"
+    assert members[2]["date"] == ""
 
 
 def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> None:
@@ -147,7 +171,6 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
             "/generate-batch",
             json={
                 "members": [
-                    {"name": "Skip Me", "id_number": "", "date": "2026-04-19", "email": "s@example.com"},
                     {"name": "Make Me", "id_number": "BATCH-1", "date": "2026-04-19", "email": "m@example.com"},
                 ],
                 "template_base64": _png_b64(),
@@ -156,9 +179,9 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
         )
         assert r.status_code == 200
         payload = r.json()
-        assert payload["total"] == 2
+        assert payload["total"] == 1
         assert payload["ok"] == 1
-        assert payload["skipped"] == 1
+        assert payload["skipped"] == 0
         assert payload["errors"] == 0
         assert "output_dir" in payload
         assert isinstance(payload["output_dir"], str)
@@ -175,6 +198,21 @@ def test_generate_batch_writes_files_and_reports_results(client: TestClient) -> 
                 (out_dir / name).unlink(missing_ok=True)
             except Exception:
                 pass
+
+
+def test_generate_batch_requires_all_fields(client: TestClient) -> None:
+    r = client.post(
+        "/generate-batch",
+        json={
+            "members": [
+                {"name": "No Date", "id_number": "X", "date": "", "email": "x@example.com"},
+            ],
+            "template_base64": _png_b64(),
+            "signature_base64": None,
+        },
+    )
+    assert r.status_code == 400
+    assert "date is required" in str(r.json().get("detail", "")).lower()
 
 
 def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) -> None:
@@ -208,6 +246,31 @@ def test_generate_single_writes_file_and_returns_output_dir(client: TestClient) 
                 (out_dir / name).unlink(missing_ok=True)
             except Exception:
                 pass
+
+
+def test_clear_cards_deletes_pngs_only(client: TestClient) -> None:
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-clear-{uuid.uuid4().hex}"
+    sub = td / "sub"
+    sub.mkdir(parents=True, exist_ok=True)
+    try:
+        (td / "a.png").write_bytes(b"fake")
+        (td / "b.txt").write_text("keep", encoding="utf-8")
+        (sub / "c.png").write_bytes(b"fake")
+
+        r = client.post("/clear-cards", json={"output_dir": str(td)})
+        assert r.status_code == 200
+        payload = r.json()
+        assert payload["output_dir"]
+        assert payload["deleted"] == 2
+
+        assert not (td / "a.png").exists()
+        assert (td / "b.txt").exists()
+        assert not (sub / "c.png").exists()
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
 
 
 def test_email_requires_smtp_fields(client: TestClient) -> None:
