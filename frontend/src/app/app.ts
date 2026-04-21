@@ -12,6 +12,8 @@ type Member = {
 
 type MemberRow = Member & { selected: boolean };
 
+type PageSize = 10 | 25 | 50 | 100 | 'all';
+
 type GenerateBatchResult = { index: number; result: 'ok' | 'skip' | 'error' };
 type GenerateBatchOut = {
   total: number;
@@ -110,6 +112,9 @@ export class App {
   protected readonly selectedIndex = signal<number | null>(null);
   protected readonly selectAll = signal(false);
 
+  protected readonly pageSize = signal<PageSize>(25);
+  protected readonly pageIndex = signal(0); // 0-based
+
   protected readonly batchStatus = signal<string | null>(null);
   protected readonly batchResult = signal<GenerateBatchOut | null>(null);
   protected readonly generatedCardCount = signal(0);
@@ -165,6 +170,27 @@ export class App {
     const rows = this.members();
     if (this.selectAll()) return rows.length;
     return rows.reduce((acc, r) => acc + (r.selected ? 1 : 0), 0);
+  });
+
+  protected readonly totalPages = computed(() => {
+    const total = this.members().length;
+    const size = this.pageSize();
+    if (size === 'all') return total > 0 ? 1 : 0;
+    return total > 0 ? Math.max(1, Math.ceil(total / size)) : 0;
+  });
+
+  protected readonly pagedMembers = computed(() => {
+    const rows = this.members();
+    const total = rows.length;
+    const size = this.pageSize();
+    if (!total) return [] as Array<{ index: number; row: MemberRow }>;
+    if (size === 'all') return rows.map((row, index) => ({ index, row }));
+    const page = Math.max(0, this.pageIndex());
+    const start = Math.min(total, page * size);
+    const end = Math.min(total, start + size);
+    const out: Array<{ index: number; row: MemberRow }> = [];
+    for (let i = start; i < end; i++) out.push({ index: i, row: rows[i] });
+    return out;
   });
 
   protected readonly selectedMembers = computed<Member[]>(() => {
@@ -318,6 +344,37 @@ export class App {
     await this.loadAssetDefaults();
     await this.loadEmailSettings();
     await this.refreshCardCount();
+  }
+
+  private clampPagination(): void {
+    const pages = this.totalPages();
+    if (!pages) {
+      this.pageIndex.set(0);
+      return;
+    }
+    const idx = this.pageIndex();
+    if (idx < 0) this.pageIndex.set(0);
+    else if (idx > pages - 1) this.pageIndex.set(pages - 1);
+  }
+
+  protected onPageSizeChange(value: string): void {
+    const v = (value ?? '').toString().trim().toLowerCase();
+    const next: PageSize =
+      v === 'all' ? 'all' : (Number(v) === 10 ? 10 : Number(v) === 25 ? 25 : Number(v) === 50 ? 50 : Number(v) === 100 ? 100 : 25);
+    this.pageSize.set(next);
+    this.pageIndex.set(0);
+    this.clampPagination();
+  }
+
+  protected prevPage(): void {
+    if (this.totalPages() <= 1) return;
+    this.pageIndex.set(Math.max(0, this.pageIndex() - 1));
+  }
+
+  protected nextPage(): void {
+    const pages = this.totalPages();
+    if (pages <= 1) return;
+    this.pageIndex.set(Math.min(pages - 1, this.pageIndex() + 1));
   }
 
   private async refreshCardCount(): Promise<void> {
@@ -615,6 +672,8 @@ export class App {
       const merged = [...this.members(), ...incomingRows].map((r) => ({ ...r, selected: true }));
       this.selectAll.set(true);
       this.members.set(merged);
+      this.pageIndex.set(0);
+      this.clampPagination();
       this.batchStatus.set(`Loaded ${incoming.length} member(s) from ${file.name}.`);
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to load CSV.';
@@ -645,6 +704,7 @@ export class App {
     const updated = [...rows, next];
     this.members.set(updated);
     this.selectRow(updated.length - 1);
+    this.clampPagination();
   }
 
   protected removeMember(index: number): void {
@@ -654,6 +714,7 @@ export class App {
     const next = rows.slice();
     next.splice(index, 1);
     this.members.set(next);
+    this.clampPagination();
 
     const sel = this.selectedIndex();
     if (sel === null) return;
@@ -679,6 +740,7 @@ export class App {
     if (!rows.length) return;
     const next = rows.map((r) => ({ ...r, selected: !!enabled }));
     this.members.set(next);
+    this.clampPagination();
   }
 
   protected toggleRowSelected(index: number, enabled: boolean): void {
@@ -702,6 +764,7 @@ export class App {
     else row[field] = value ?? '';
     nextRows[index] = row;
     this.members.set(nextRows);
+    this.clampPagination();
 
     if (this.selectedIndex() === index) {
       this.name.set(row.name || '');

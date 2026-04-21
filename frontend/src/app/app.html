@@ -192,6 +192,39 @@
               Total: {{ batchResult()!.total }} &middot; OK: {{ batchResult()!.ok }} &middot; Skipped: {{ batchResult()!.skipped }} &middot; Errors: {{ batchResult()!.errors }}
             </div>
           </div>
+
+          <div class="row row--wrap" *ngIf="members().length">
+            <label class="label">Rows shown</label>
+            <select
+              class="input"
+              [value]="pageSize()"
+              (change)="onPageSizeChange($any($event.target).value)"
+              [disabled]="isLoading()"
+              title="Choose how many member rows to show"
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="all">All</option>
+            </select>
+
+            <div class="row" *ngIf="pageSize() !== 'all' && totalPages() > 1">
+              <button class="btn btn--secondary btn--chip" type="button" (click)="prevPage()" [disabled]="pageIndex() === 0" title="Previous page">
+                Prev
+              </button>
+              <div class="status">Page {{ pageIndex() + 1 }} of {{ totalPages() }}</div>
+              <button
+                class="btn btn--secondary btn--chip"
+                type="button"
+                (click)="nextPage()"
+                [disabled]="pageIndex() + 1 >= totalPages()"
+                title="Next page"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="tableWrap">
@@ -217,57 +250,57 @@
             </thead>
             <tbody>
               @if (members().length) {
-                @for (m of members(); track trackIndex($index)) {
+                @for (item of pagedMembers(); track trackIndex(item.index)) {
                   <tr
                     class="tableRow"
-                    [class.tableRow--selected]="selectedIndex() === $index"
-                    (click)="selectRow($index)"
+                    [class.tableRow--selected]="selectedIndex() === item.index"
+                    (click)="selectRow(item.index)"
                   >
                     <td class="colSelect" (click)="$event.stopPropagation()">
                       <label class="checkbox checkbox--table">
                         <input
                           type="checkbox"
-                          [checked]="m.selected"
+                          [checked]="item.row.selected"
                           (click)="$event.stopPropagation()"
-                          (change)="toggleRowSelected($index, $any($event.target).checked)"
+                          (change)="toggleRowSelected(item.index, $any($event.target).checked)"
                         />
                       </label>
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'name')"
-                        [value]="m.name"
-                        (input)="updateRowField($index, 'name', $any($event.target).value)"
+                        [class.tableCellInput--invalid]="isWorkSelected(item.row) && isInvalid(item.row, 'name')"
+                        [value]="item.row.name"
+                        (input)="updateRowField(item.index, 'name', $any($event.target).value)"
                       />
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'id_number')"
-                        [value]="m.id_number"
-                        (input)="updateRowField($index, 'id_number', $any($event.target).value)"
+                        [class.tableCellInput--invalid]="isWorkSelected(item.row) && isInvalid(item.row, 'id_number')"
+                        [value]="item.row.id_number"
+                        (input)="updateRowField(item.index, 'id_number', $any($event.target).value)"
                       />
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'date')"
+                        [class.tableCellInput--invalid]="isWorkSelected(item.row) && isInvalid(item.row, 'date')"
                         placeholder="YYYY-MM-DD"
-                        [value]="m.date"
-                        (input)="updateRowField($index, 'date', $any($event.target).value)"
+                        [value]="item.row.date"
+                        (input)="updateRowField(item.index, 'date', $any($event.target).value)"
                       />
                     </td>
                     <td>
                       <input
                         class="tableCellInput"
-                        [class.tableCellInput--invalid]="isWorkSelected(m) && isInvalid(m, 'email')"
-                        [value]="m.email"
-                        (input)="updateRowField($index, 'email', $any($event.target).value)"
+                        [class.tableCellInput--invalid]="isWorkSelected(item.row) && isInvalid(item.row, 'email')"
+                        [value]="item.row.email"
+                        (input)="updateRowField(item.index, 'email', $any($event.target).value)"
                       />
                     </td>
                     <td class="colActions" (click)="$event.stopPropagation()">
-                      <button class="iconBtn" (click)="removeMember($index)" [disabled]="isLoading()" title="Remove this member row">
+                      <button class="iconBtn" (click)="removeMember(item.index)" [disabled]="isLoading()" title="Remove this member row">
                         ×
                       </button>
                     </td>
