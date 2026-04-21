@@ -19,6 +19,7 @@ import toga
 from .api_app import app as api_app, get_default_settings_path
 from .api_app import set_choose_output_dir_callback
 from .api_app import set_choose_asset_callback
+from .api_app import set_open_help_callback
 from .constants import APP_TITLE
 from .core.resources import resource_path
 
@@ -316,6 +317,14 @@ class IDCardApp(toga.App):
             except Exception:
                 pass
 
+    def _open_help_blocking(self) -> None:
+        help_path = resource_path(self, "help.html")
+        if help_path.exists():
+            try:
+                webbrowser.open(help_path.as_uri())
+            except Exception:
+                pass
+
     def startup(self):
         self.main_window: toga.MainWindow = toga.MainWindow(
             title=APP_TITLE,
@@ -334,6 +343,7 @@ class IDCardApp(toga.App):
         # Allow the Angular UI to open a native folder picker via the API.
         set_choose_output_dir_callback(self._choose_output_dir_blocking)
         set_choose_asset_callback(self._choose_asset_blocking)
+        set_open_help_callback(self._open_help_blocking)
 
         # Start backend API in-process (no business logic duplication in Angular).
         self._start_api_server()

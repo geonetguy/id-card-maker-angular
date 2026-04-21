@@ -43,56 +43,57 @@
 </head>
 <body>
   <h1>ID Card Maker</h1>
-  <p class="tip">Press <kbd>F1</kbd> or choose <em>Help → Help</em> to open this page.</p>
+  <p class="tip">Press <kbd>F1</kbd> or choose <em>Help &gt; Help</em> to open this page.</p>
 
   <div class="toc" aria-label="Table of contents">
     <a href="#overview">Overview</a>
     <a href="#workflow">Workflow</a>
-    <a href="#assets">Assets</a>
+    <a href="#assets">Settings</a>
     <a href="#members">Members</a>
     <a href="#buttons">Buttons</a>
-    <a href="#csv">CSV Import/Export</a>
-    <a href="#generate">Generate Cards</a>
+    <a href="#csv">Load/Export CSV</a>
+    <a href="#create">Create Cards</a>
     <a href="#email">Email Cards</a>
-    <a href="#output">Output Folder</a>
+    <a href="#output">Save Folder</a>
     <a href="#shortcuts">Shortcuts</a>
     <a href="#troubleshooting">Troubleshooting</a>
   </div>
 
   <h2 id="overview">Overview</h2>
-  <p>ID Card Maker creates membership ID cards as PNG images from member data.</p>
+  <p>ID Card Maker creates membership ID cards from member information.</p>
   <ul>
     <li><strong>Preview</strong> shows what the card will look like for the currently selected row.</li>
-    <li><strong>Members table</strong> is where you enter or import member data.</li>
-    <li><strong>Generate card(s)</strong> saves PNG files for selected rows.</li>
+    <li><strong>Members table</strong> is where you enter or load member information.</li>
+    <li><strong>Create card(s)</strong> saves ID cards for selected rows.</li>
     <li><strong>Email card(s)</strong> sends emails (with cards attached) for selected rows.</li>
   </ul>
 
   <h2 id="workflow">Recommended workflow</h2>
   <ol>
-    <li><strong>Set the template</strong> (required) and signature (optional). Use <em>Set as default</em> so they auto-load on startup.</li>
-    <li><strong>Add members</strong> by uploading a CSV or clicking <em>Add member</em> and typing directly into the table.</li>
-    <li><strong>Select rows</strong> you want to work on (checkboxes in the first column, or <em>Select all</em> in the header).</li>
-    <li><strong>Generate card(s)</strong> to create PNG files for the selected rows.</li>
-    <li><strong>Email card(s)</strong> to send cards to the selected rows’ email addresses.</li>
-    <li><strong>Open folder</strong> to view saved cards, and <strong>Export CSV</strong> to save your updated list.</li>
+    <li><strong>Choose the ID card image</strong> (required) and <strong>Signature image</strong> (required). If you want, check <em>Set as default</em> so they load automatically next time.</li>
+    <li><strong>Choose the Save folder</strong> (required). If you want, check <em>Set as default</em> so it loads automatically next time.</li>
+    <li><strong>Add members</strong> by loading a CSV or clicking <em>Add member</em> and typing directly into the table.</li>
+    <li><strong>Select the rows</strong> you want to work on using the checkboxes (or <em>Select all</em>).</li>
+    <li>Click <strong>Create card(s)</strong> to save ID cards.</li>
+    <li>Click <strong>Email card(s)</strong> to email cards to members.</li>
+    <li>Use <strong>Open folder</strong> to view cards, and <strong>Export CSV</strong> to save your updated list.</li>
   </ol>
 
-  <p class="warn"><strong>Button availability:</strong> Buttons are disabled until prerequisites are met (for example, you must load a template before generating/emailing, and you must select at least one row).</p>
+  <p class="warn"><strong>Buttons turn on as you go:</strong> Some buttons are disabled until you have chosen the required files/folder and filled in the required member details.</p>
 
-  <h2 id="assets">Assets (Template &amp; Signature)</h2>
+  <h2 id="assets">Settings (ID card &amp; Signature)</h2>
   <p>
-    The <strong>Template image</strong> is the background for the ID card and is required.
-    The <strong>Signature image</strong> is optional and is overlaid on top of the template.
+    The <strong>ID card image</strong> is the background for the card and is required.
+    The <strong>Signature image</strong> is placed on top of the card and is required.
   </p>
   <ul>
-    <li><strong>Choose file…</strong> selects an image from your computer.</li>
-    <li><strong>Set as default</strong> saves your selection so it automatically loads at startup.</li>
-    <li>If you change template/signature later, the preview and newly generated cards use the latest selections.</li>
+    <li><strong>Choose file...</strong> selects an image from your computer.</li>
+    <li><strong>Set as default</strong> saves your selection so it loads automatically next time.</li>
+    <li>If you change the ID card image or signature later, the preview and new cards use the latest selections.</li>
   </ul>
 
   <h2 id="members">Members table</h2>
-  <p>Member data is entered and edited directly in the table.</p>
+  <p>Member information is entered and edited directly in the table.</p>
   <table>
     <thead>
       <tr>
@@ -109,7 +110,7 @@
       </tr>
       <tr>
         <td><strong>ID Number</strong></td>
-        <td>Printed on the card; used as the base filename; required for generate/email.</td>
+        <td>Printed on the card; used as the base filename; required for create/email.</td>
         <td>Format: <code>7 digits</code> (example: <code>2010031</code>).</td>
       </tr>
       <tr>
@@ -124,26 +125,28 @@
       </tr>
     </tbody>
   </table>
+  <p><strong>All four fields are required</strong> for any row you want to create or email.</p>
   <ul>
     <li><strong>Add member</strong> inserts a new empty row.</li>
-    <li><strong>Remove row</strong> deletes a row using the <strong>×</strong> button at the far right of that row.</li>
-    <li><strong>Select a row</strong> by clicking it to update the preview. (Selection is separate from the checkbox “work list”.)</li>
-    <li><strong>Select work rows</strong> using the checkbox column; only checked rows are generated/emailed.</li>
+    <li><strong>Remove row</strong> deletes a row using the Remove button at the far right of that row.</li>
+    <li><strong>Preview a row</strong> by clicking it. (This is separate from the checkboxes.)</li>
+    <li><strong>Select work rows</strong> using the checkbox column; only checked rows are created/emailed.</li>
   </ul>
 
-  <h2 id="buttons">Buttons (order of operations)</h2>
+  <h2 id="buttons">Buttons (what to click and when)</h2>
   <p>The buttons above the members table are ordered to match the recommended workflow:</p>
   <ol>
     <li><strong>Add member</strong> — inserts a new empty row.</li>
-    <li><strong>Generate card(s)</strong> — generates PNGs for the checked rows.</li>
+    <li><strong>Create card(s)</strong> — creates ID cards for the checked rows.</li>
     <li><strong>Email card(s)</strong> — sends emails for the checked rows.</li>
-    <li><strong>Open folder</strong> — opens the current output folder.</li>
-    <li><strong>Export CSV</strong> — downloads a CSV containing the current table rows.</li>
+    <li><strong>Open folder</strong> — opens the current save folder.</li>
+    <li><strong>Export CSV</strong> — saves a CSV file containing the current table rows.</li>
+    <li><strong>Clear cards</strong> — deletes saved ID cards from the save folder. (You must click it twice to confirm.)</li>
   </ol>
 
-  <h2 id="csv">CSV import &amp; export</h2>
-  <h3>Import (Upload members CSV)</h3>
-  <p>The CSV must contain a header row with these columns (case/space-insensitive):</p>
+  <h2 id="csv">Load and export CSV</h2>
+  <h3>Load (Load members CSV)</h3>
+  <p>A CSV is a simple spreadsheet file (you can open it in Excel). Your CSV must have a first row with these column names:</p>
   <table>
     <thead>
       <tr><th class="mono">name</th><th class="mono">id_number</th><th class="mono">date</th><th class="mono">email</th></tr>
@@ -153,42 +156,43 @@
     </tbody>
   </table>
   <ul>
-    <li>Dates are normalized to <code>YYYY-MM-DD</code> on import when possible. You can only generate/email when the Date column contains valid <code>YYYY-MM-DD</code> values.</li>
-    <li>After import, use the checkboxes to choose which rows to generate/email.</li>
+    <li>Dates are normalized to <code>YYYY-MM-DD</code> on import when possible. You can only create/email when the Date column contains valid <code>YYYY-MM-DD</code> values.</li>
+    <li>After import, use the checkboxes to choose which rows to create/email.</li>
   </ul>
 
   <h3>Export (Export CSV)</h3>
   <ul>
-    <li>Exports the current table as CSV so you can archive it or re-import later.</li>
-    <li>Tip: Export after you’ve added rows or corrected emails/dates.</li>
+    <li>Exports the current table as CSV so you can save it and load it again later.</li>
+    <li>Tip: Export after you have added rows or corrected emails/dates.</li>
   </ul>
 
-  <h2 id="generate">Generating card(s)</h2>
+  <h2 id="create">Creating card(s)</h2>
   <ul>
-    <li>Load a <strong>Template image</strong> first.</li>
-    <li>Check the rows you want to generate, then click <strong>Generate card(s)</strong>.</li>
-    <li>Cards are saved as PNG files (one per selected row), using <strong>ID Number</strong> as the base filename.</li>
-    <li>Rows missing required data may be skipped; check the “Batch” status for a summary.</li>
+    <li>Choose the <strong>ID card image</strong>, <strong>Signature image</strong>, and <strong>Save folder</strong> first.</li>
+    <li>Check the rows you want to create, then click <strong>Create card(s)</strong>.</li>
+    <li>ID cards are saved as files (one per selected row), using <strong>ID Number</strong> as the base filename.</li>
+    <li>If something is missing or not valid in a checked row, it will have a red border.</li>
   </ul>
 
   <h2 id="email">Emailing card(s)</h2>
   <p>Email sending uses the configured <strong>active email account</strong> (Microsoft or Gmail).</p>
   <ol>
-    <li>Open <strong>Email settings</strong> (top menu area).</li>
+    <li>Open <strong>Email settings</strong> at the top of the app.</li>
     <li>Choose the active account: <strong>Microsoft</strong> or <strong>Gmail</strong>.</li>
-    <li>Optional: enable <strong>Union Management System</strong> and enter its email to send a copy of every card email.</li>
+    <li>Choose the sender (President, Vice President, or Membership Officer). The message will switch to match that sender.</li>
+    <li>Optional: turn on <strong>Union Management System</strong> and enter its email address to send a copy of every email.</li>
     <li>Enter <strong>Email</strong> and <strong>Password</strong> for the active account. (An app password may be required.)</li>
-    <li>Optionally set <strong>From name</strong>, and customize the <strong>Subject</strong> and <strong>Body</strong> templates.</li>
+    <li>Optionally set <strong>From name</strong>, and customize the <strong>Subject</strong> and <strong>Message</strong>.</li>
     <li>Click <strong>Save</strong>. Then click <strong>Email card(s)</strong> above the members table.</li>
   </ol>
   <ul>
     <li><strong>Only checked rows are emailed.</strong></li>
-    <li>Rows missing an <strong>ID Number</strong> or <strong>Email</strong> are skipped.</li>
-    <li>If a card image doesn’t exist yet, the app will <strong>generate it automatically</strong> (best-effort) as part of the email send.</li>
+    <li>Every checked row must have all required fields filled in.</li>
+    <li>Create the ID cards first. Emailing will only attach cards that already exist in the Save folder.</li>
   </ul>
 
-  <h3>Template placeholders</h3>
-  <p>You can use these placeholders in Subject/Body templates:</p>
+  <h3>Fill-in words for your email</h3>
+  <p>You can use these fill-in words in your email Subject and Message:</p>
   <ul>
     <li><code>{name}</code>, <code>{id_number}</code>, <code>{date}</code>, <code>{email}</code>, <code>{sender}</code></li>
   </ul>
@@ -200,33 +204,34 @@
     <li class="muted">If your organization uses different SMTP settings, follow the instructions from your administrator.</li>
   </ul>
 
-  <h2 id="output">Output folder (required)</h2>
-  <p>The output folder is where generated PNG files are saved and where email attachments are found/created. Generating and emailing require an output folder.</p>
+  <h2 id="output">Save folder (required)</h2>
+  <p>The save folder is where ID cards are saved. When you email cards, the app looks in the save folder to find the ID cards to attach.</p>
   <ul>
-    <li>Use <strong>Choose…</strong> to pick a folder, or type a path manually.</li>
-    <li><strong>Open folder</strong> opens the current output folder in your file explorer.</li>
+    <li>Use <strong>Choose folder...</strong> to pick a folder.</li>
+    <li><strong>Set as default</strong> saves the save folder so it loads automatically next time.</li>
+    <li><strong>Open folder</strong> opens the save folder so you can see your ID cards.</li>
   </ul>
 
   <h2 id="shortcuts">Keyboard &amp; tips</h2>
   <ul>
-    <li><kbd>F1</kbd> — Open this Help page.</li>
-    <li><strong>Preview vs selection:</strong> Clicking a row selects it for preview; checkboxes control what gets generated/emailed.</li>
+    <li><kbd>F1</kbd> - Open this Help page.</li>
+    <li><strong>Preview vs selection:</strong> Clicking a row selects it for preview; checkboxes control what gets created/emailed.</li>
     <li><strong>Status messages:</strong> Watch the “Batch” and “Email” status lines for summaries and errors.</li>
   </ul>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
   <ul>
-    <li><strong>Generate/Email buttons are disabled:</strong> Load a template and check at least one row.</li>
-    <li><strong>Email says to enter email + password:</strong> Open Email settings, pick the active account, enter credentials, click Save, then try again.</li>
-    <li><strong>Some rows were skipped:</strong> Ensure each checked row has an ID number and (for email) an email address.</li>
-    <li><strong>Date didn’t print:</strong> Use <code>YYYY-MM-DD</code>. Unrecognized dates may be left blank.</li>
-    <li><strong>Preview is blank:</strong> Load a template image, then click a row to select it.</li>
+    <li><strong>Create/Email buttons are disabled:</strong> Choose the ID card image, Signature image, and Save folder. Then check at least one row and fill in all required fields.</li>
+    <li><strong>Email says to enter email + password:</strong> Open Email settings, choose the active account, enter your email and password, click Save, then try again.</li>
+    <li><strong>Email login failed:</strong> Double-check your email and password. If you use two-step sign-in, you may need an app password. Some workplaces also block email sending unless IT turns it on.</li>
+    <li><strong>Date did not print:</strong> Use <code>YYYY-MM-DD</code>.</li>
+    <li><strong>Preview is blank:</strong> Choose the ID card image and Signature image, then click a row to preview it.</li>
   </ul>
 
   <h2>Privacy &amp; storage</h2>
   <ul>
-    <li>Email credentials are used to send email. Depending on settings, passwords may be saved to support auto-loading on startup.</li>
-    <li>Generated cards and exported CSV files are saved on your computer.</li>
+    <li>Your email address and password are used to send email. For safety, the app does not save your password.</li>
+    <li>Created ID cards and exported CSV files are saved on your computer.</li>
   </ul>
 
   <p><small>For assistance, contact your administrator.</small></p>

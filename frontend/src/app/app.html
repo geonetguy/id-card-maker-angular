@@ -1,4 +1,4 @@
-<div class="app">
+<div class="app" (window:keydown)="onWindowKeydown($event)">
   <header class="header">
     <div class="header__brand">
       <img class="header__logo" src="/cupe-logo.png" alt="CUPE 3523" />
@@ -6,16 +6,18 @@
     </div>
     <div class="header__menu">
       <div class="pill">Active email: {{ emailActive() === 'microsoft' ? 'Microsoft' : 'Gmail' }}</div>
-      <button class="btn btn--secondary" (click)="openSettings()">Email settings</button>
+      <button class="btn btn--secondary" (click)="openSettings()" title="Set up email and sender details">Email settings</button>
     </div>
   </header>
 
   <div class="grid">
     <section class="panel">
-      <h2>Assets</h2>
+      <div class="panel__banner">
+        <h2>Settings</h2>
+      </div>
 
       <div class="field">
-        <label class="label">Template image (required)</label>
+        <label class="label">ID card image</label>
         <div class="fileRow">
           <input
             #templateFile
@@ -24,7 +26,7 @@
             accept="image/*"
             (change)="onPickImage('template', $any($event.target).files?.item(0) ?? null)"
           />
-          <button class="btn btn--secondary" (click)="templateFile.click()" [disabled]="isLoading()">
+          <button class="btn btn--secondary" (click)="templateFile.click()" [disabled]="isLoading()" title="Choose the ID card image file">
             Choose file…
           </button>
           <label class="checkbox">
@@ -43,7 +45,7 @@
       </div>
 
       <div class="field">
-        <label class="label">Signature image (required)</label>
+        <label class="label">Signature image</label>
         <div class="fileRow">
           <input
             #signatureFile
@@ -52,7 +54,7 @@
             accept="image/*"
             (change)="onPickImage('signature', $any($event.target).files?.item(0) ?? null)"
           />
-          <button class="btn btn--secondary" (click)="signatureFile.click()" [disabled]="isLoading()">
+          <button class="btn btn--secondary" (click)="signatureFile.click()" [disabled]="isLoading()" title="Choose the signature image file">
             Choose file…
           </button>
           <label class="checkbox">
@@ -70,9 +72,9 @@
         </div>
       </div>
 
-      <h2>CSV</h2>
+      <h2>Members</h2>
       <div class="field">
-        <label class="label">Upload members CSV</label>
+        <label class="label">Load members CSV</label>
         <div class="fileRow">
           <input
             #csvFile
@@ -81,16 +83,16 @@
             accept=".csv,text/csv"
             (change)="onUploadCsv(csvFile, $any($event.target).files?.item(0) ?? null)"
           />
-          <button class="btn btn--secondary" (click)="csvFile.click()" [disabled]="isLoading()">
+          <button class="btn btn--secondary" (click)="csvFile.click()" [disabled]="isLoading()" title="Load a list of members from a CSV file">
             Choose file…
           </button>
         </div>
       </div>
 
       <div class="field">
-        <label class="label">Output folder (required)</label>
+        <label class="label">Save folder</label>
         <div class="row">
-          <button class="btn btn--secondary" (click)="chooseOutputDir()" [disabled]="isLoading() || isChoosingOutputDir()">
+          <button class="btn btn--secondary" (click)="chooseOutputDir()" [disabled]="isLoading() || isChoosingOutputDir()" title="Choose where ID cards will be saved">
             Choose folder …
           </button>
         </div>
@@ -113,14 +115,16 @@
             Set as default
           </label>
         </div>
-        <div class="hint">Generate and email actions require an output folder.</div>
+        <div class="hint">Create and email actions require a save folder.</div>
       </div>
 
     </section>
 
     <div class="rightCol">
       <section class="panel panel--preview">
-        <h2>Preview</h2>
+        <div class="panel__banner">
+          <h2>Preview</h2>
+        </div>
         <div class="preview" *ngIf="previewSrc(); else noPreview">
           <img class="preview__img" [src]="previewSrc()!" alt="ID card preview" />
         </div>
@@ -130,20 +134,21 @@
       </section>
 
       <section class="panel panel--table">
-        <h2>Members ({{ members().length }})</h2>
-
-        <div class="tableToolbar">
-          <div class="actions">
-            <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder()">Add member</button>
-            <button class="btn btn--secondary" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Generate card(s)</button>
-            <button class="btn btn--secondary" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()">Email card(s)</button>
-            <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()">Open folder</button>
-            <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0">Export CSV</button>
-            <button class="btn btn--danger" (click)="clearCards()" [disabled]="isLoading()">
+        <div class="panel__banner">
+          <h2>Members ({{ members().length }})</h2>
+          <div class="panel__bannerActions">
+            <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder()" title="Add a new empty member row">Add member</button>
+            <button class="btn btn--secondary" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()" title="Create ID cards for checked rows">Create card(s)</button>
+            <button class="btn btn--secondary" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()" title="Email ID cards for checked rows">Email card(s)</button>
+            <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()" title="Open the save folder">Open folder</button>
+            <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0" title="Save the current members list as a CSV file">Export CSV</button>
+            <button class="btn btn--secondary" (click)="clearCards()" [disabled]="isLoading() || !hasGeneratedCards()" title="Delete saved ID cards from the save folder">
               {{ clearConfirm() ? 'Click again to confirm (6s)' : 'Clear cards' }}
             </button>
           </div>
+        </div>
 
+        <div class="tableToolbar">
           <div
             class="statusStack"
             *ngIf="
@@ -167,7 +172,7 @@
             <div class="status" *ngIf="emailStatus()">Email: {{ emailStatus() }}</div>
             <div class="status" *ngIf="batchStatus()">Batch: {{ batchStatus() }}</div>
             <div class="status status--req" *ngIf="!hasOutputFolder()">
-              Required: choose an <strong>Output folder</strong> before generating or emailing cards.
+              Required: choose a <strong>Save folder</strong> before creating or emailing cards.
             </div>
             <div class="status status--req" *ngIf="selectedCount() > 0 && !selectedRowsComplete()">
               Required/Invalid: fix <strong>Name</strong>, <strong>ID Number</strong> (<span class="mono">7 digits</span>), <strong>Date</strong> (<span class="mono">YYYY-MM-DD</span>), and <strong>Email</strong> for all selected rows.
@@ -262,7 +267,7 @@
                       />
                     </td>
                     <td class="colActions" (click)="$event.stopPropagation()">
-                      <button class="iconBtn" (click)="removeMember($index)" [disabled]="isLoading()" title="Remove row">
+                      <button class="iconBtn" (click)="removeMember($index)" [disabled]="isLoading()" title="Remove this member row">
                         ×
                       </button>
                     </td>
@@ -281,7 +286,7 @@
             </tbody>
           </table>
         </div>
-        <div class="empty" *ngIf="members().length === 0">Upload a CSV or add a member to populate the table.</div>
+        <div class="empty" *ngIf="members().length === 0">Load a CSV or add a member to populate the table.</div>
       </section>
     </div>
   </div>
@@ -292,7 +297,7 @@
     <div class="modal__header">
       <div class="modal__title">Email settings</div>
       <div class="modal__spacer"></div>
-      <button class="btn btn--ghost" (click)="closeSettings()">Close</button>
+      <button class="btn btn--ghost" (click)="closeSettings()" title="Close email settings">Close</button>
     </div>
 
     <div class="modal__body">
@@ -340,16 +345,17 @@
         <div class="field">
           <label class="label">Quick sender</label>
           <div class="row row--wrap">
-            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('President')" [disabled]="isSavingSettings()">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('President')" [disabled]="isSavingSettings()" title="Use President sender settings">
               President
             </button>
-            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Vice President')" [disabled]="isSavingSettings()">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Vice President')" [disabled]="isSavingSettings()" title="Use Vice President sender settings">
               Vice President
             </button>
-            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Membership Officer')" [disabled]="isSavingSettings()">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Membership Officer')" [disabled]="isSavingSettings()" title="Use Membership Officer sender settings">
               Membership Officer
             </button>
           </div>
+          <div class="hint">Current sender: <strong>{{ emailSender() }}</strong></div>
         </div>
 
         <div class="field">
@@ -361,12 +367,6 @@
           <input type="password" class="input" [value]="msPassword()" (input)="msPassword.set($any($event.target).value)" />
         </div>
         <div class="field">
-          <label class="checkbox">
-            <input type="checkbox" [checked]="msSavePassword()" (change)="msSavePassword.set($any($event.target).checked)" />
-            Save password (stored in plain text)
-          </label>
-        </div>
-        <div class="field">
           <label class="label">From name (optional)</label>
           <input class="input" [value]="msFromName()" (input)="msFromName.set($any($event.target).value)" />
         </div>
@@ -375,7 +375,7 @@
           <input class="input" [value]="msSubjectTpl()" (input)="msSubjectTpl.set($any($event.target).value)" />
         </div>
         <div class="field">
-          <label class="label">Body template</label>
+          <label class="label">Message</label>
           <textarea class="textarea" rows="8" [value]="msBodyTpl()" (input)="msBodyTpl.set($any($event.target).value)"></textarea>
           <div class="hint">
             Available:
@@ -398,16 +398,17 @@
         <div class="field">
           <label class="label">Quick sender</label>
           <div class="row row--wrap">
-            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('President')" [disabled]="isSavingSettings()">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('President')" [disabled]="isSavingSettings()" title="Use President sender settings">
               President
             </button>
-            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Vice President')" [disabled]="isSavingSettings()">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Vice President')" [disabled]="isSavingSettings()" title="Use Vice President sender settings">
               Vice President
             </button>
-            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Membership Officer')" [disabled]="isSavingSettings()">
+            <button class="btn btn--secondary btn--chip" type="button" (click)="applyQuickSender('Membership Officer')" [disabled]="isSavingSettings()" title="Use Membership Officer sender settings">
               Membership Officer
             </button>
           </div>
+          <div class="hint">Current sender: <strong>{{ emailSender() }}</strong></div>
         </div>
 
         <div class="field">
@@ -419,12 +420,6 @@
           <input type="password" class="input" [value]="gmailPassword()" (input)="gmailPassword.set($any($event.target).value)" />
         </div>
         <div class="field">
-          <label class="checkbox">
-            <input type="checkbox" [checked]="gmailSavePassword()" (change)="gmailSavePassword.set($any($event.target).checked)" />
-            Save password (stored in plain text)
-          </label>
-        </div>
-        <div class="field">
           <label class="label">From name (optional)</label>
           <input class="input" [value]="gmailFromName()" (input)="gmailFromName.set($any($event.target).value)" />
         </div>
@@ -433,7 +428,7 @@
           <input class="input" [value]="gmailSubjectTpl()" (input)="gmailSubjectTpl.set($any($event.target).value)" />
         </div>
         <div class="field">
-          <label class="label">Body template</label>
+          <label class="label">Message</label>
           <textarea class="textarea" rows="8" [value]="gmailBodyTpl()" (input)="gmailBodyTpl.set($any($event.target).value)"></textarea>
           <div class="hint">
             Available:
@@ -448,13 +443,14 @@
     </div>
 
     <div class="modal__footer">
-      <button class="btn btn--secondary" (click)="loadEmailSettings()" [disabled]="isSavingSettings()">Reload</button>
-      <button class="btn" (click)="saveEmailSettings()" [disabled]="isSavingSettings()">Save</button>
+      <button class="btn btn--secondary" (click)="loadEmailSettings()" [disabled]="isSavingSettings()" title="Reload saved email settings">Reload</button>
+      <button class="btn" (click)="saveEmailSettings()" [disabled]="isSavingSettings()" title="Save email settings (password is not saved)">Save</button>
       <button
         class="btn"
         *ngIf="pendingSend()"
         (click)="sendPendingFromModal()"
         [disabled]="isSavingSettings() || isEmailing() || !canSendWithActiveSettings()"
+        title="Send email now"
       >
         Send
       </button>

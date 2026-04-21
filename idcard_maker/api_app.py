@@ -20,6 +20,7 @@ import io
 import json
 import os
 import re
+import webbrowser
 import smtplib
 import socket
 import sys
@@ -63,6 +64,7 @@ if not _DEFAULT_FONT_PATH.exists():
 
 _choose_output_dir_callback: Optional[Callable[[Optional[str]], Optional[str]]] = None
 _choose_asset_callback: Optional[Callable[[str, Optional[str]], Optional[str]]] = None
+_open_help_callback: Optional[Callable[[], None]] = None
 
 
 def set_choose_output_dir_callback(cb: Callable[[Optional[str]], Optional[str]]) -> None:
@@ -85,6 +87,16 @@ def set_choose_asset_callback(cb: Callable[[str, Optional[str]], Optional[str]])
     """
     global _choose_asset_callback
     _choose_asset_callback = cb
+
+
+def set_open_help_callback(cb: Callable[[], None]) -> None:
+    """
+    Injected by the Toga shell at runtime.
+
+    Callback is expected to open the local help file in the system browser.
+    """
+    global _open_help_callback
+    _open_help_callback = cb
 
 
 def _default_output_dir() -> Path:
@@ -210,12 +222,12 @@ _DEFAULT_BODY_TPL = "Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nD
 
 
 EmailProvider = Literal["microsoft", "gmail"]
+EmailSender = Literal["President", "Vice President", "Membership Officer"]
 
 
 class EmailAccountSettings(BaseModel):
     email: str = ""
     password: str = ""
-    save_password: bool = False
     from_name: str = ""
     subject_tpl: str = _DEFAULT_SUBJECT_TPL
     body_tpl: str = _DEFAULT_BODY_TPL
@@ -237,8 +249,11 @@ class UnionManagementSettings(BaseModel):
 
 class EmailSettingsV2(BaseModel):
     active: EmailProvider = "microsoft"
+    active_sender: EmailSender = "Membership Officer"
     microsoft: EmailAccountSettings = Field(default_factory=EmailAccountSettings)
     gmail: EmailAccountSettings = Field(default_factory=EmailAccountSettings)
+    microsoft_senders: dict[EmailSender, EmailAccountSettings] = Field(default_factory=dict)
+    gmail_senders: dict[EmailSender, EmailAccountSettings] = Field(default_factory=dict)
     union_management: UnionManagementSettings = Field(default_factory=UnionManagementSettings)
     defaults: dict[EmailProvider, EmailProviderDefaults] = Field(default_factory=dict)
 
@@ -335,6 +350,22 @@ def _email_settings_from_json(data: dict) -> EmailSettingsV2:
         try:
             settings = EmailSettingsV2(**raw)
             settings.defaults = defaults
+            # Passwords are never persisted; always clear any loaded values.
+            settings.microsoft.password = ""
+            settings.gmail.password = ""
+            for p in (settings.microsoft_senders or {}).values():
+                try:
+                    p.password = ""
+                except Exception:
+                    pass
+            for p in (settings.gmail_senders or {}).values():
+                try:
+                    p.password = ""
+                except Exception:
+                    pass
+            # If sender profiles exist but active_sender isn't set, pick a safe default.
+            if not getattr(settings, "active_sender", None):
+                settings.active_sender = "Membership Officer"
             return settings
         except Exception:
             pass
@@ -344,11 +375,10 @@ def _email_settings_from_json(data: dict) -> EmailSettingsV2:
     if isinstance(raw, dict):
         from_email = (raw.get("from_email") or raw.get("username") or "").strip()
         ms.email = str(from_email)
-        ms.password = str(raw.get("password") or "")
         ms.from_name = str(raw.get("from_name") or "")
         ms.subject_tpl = str(raw.get("subject_tpl") or _DEFAULT_SUBJECT_TPL)
         ms.body_tpl = str(raw.get("body_tpl") or _DEFAULT_BODY_TPL)
-        ms.save_password = bool(ms.password)
+        ms.password = ""
 
     settings = EmailSettingsV2(active="microsoft", microsoft=ms, gmail=EmailAccountSettings(), defaults=defaults)
     return settings
@@ -358,8 +388,11 @@ def _email_settings_to_json(settings: EmailSettingsV2) -> dict:
     # Do not persist provider defaults; they're built-in.
     return {
         "active": settings.active,
+        "active_sender": settings.active_sender,
         "microsoft": settings.microsoft.model_dump(),
         "gmail": settings.gmail.model_dump(),
+        "microsoft_senders": {k: v.model_dump() for k, v in (settings.microsoft_senders or {}).items()},
+        "gmail_senders": {k: v.model_dump() for k, v in (settings.gmail_senders or {}).items()},
         "union_management": settings.union_management.model_dump(),
     }
 
@@ -386,6 +419,15 @@ class ClearCardsOut(BaseModel):
     deleted: int
 
 
+class CardsCountOut(BaseModel):
+    output_dir: str
+    count: int
+
+
+class OpenHelpOut(BaseModel):
+    ok: bool
+
+
 class SMTPConfigIn(BaseModel):
     host: str = ""
     port: int = 587
@@ -402,7 +444,8 @@ class EmailIn(BaseModel):
     smtp: Optional[SMTPConfigIn] = None
     subject_tpl: str = _DEFAULT_SUBJECT_TPL
     body_tpl: str = _DEFAULT_BODY_TPL
-    # Optional: if attachment doesn't exist, API can generate it using these assets
+    # Note: kept for backwards compatibility with the UI payload.
+    # Email sending no longer creates missing cards automatically.
     template_base64: Optional[str] = None
     signature_base64: Optional[str] = None
     output_dir: Optional[str] = None
@@ -475,11 +518,19 @@ def put_email_settings(body: EmailSettingsV2) -> EmailSettingsV2:
     if not isinstance(data, dict):
         data = {}
 
-    # Ensure we don't store a password unless the user explicitly opted in.
-    if not body.microsoft.save_password:
-        body.microsoft.password = ""
-    if not body.gmail.save_password:
-        body.gmail.password = ""
+    # Never persist passwords.
+    body.microsoft.password = ""
+    body.gmail.password = ""
+    for p in (body.microsoft_senders or {}).values():
+        try:
+            p.password = ""
+        except Exception:
+            pass
+    for p in (body.gmail_senders or {}).values():
+        try:
+            p.password = ""
+        except Exception:
+            pass
 
     data["email"] = _email_settings_to_json(body)
     _write_settings_json(data)
@@ -784,6 +835,50 @@ def clear_cards(body: ClearCardsIn) -> ClearCardsOut:
         raise HTTPException(status_code=500, detail="internal_error") from e
 
 
+@app.get("/cards/count", response_model=CardsCountOut)
+def cards_count(output_dir: Optional[str] = None) -> CardsCountOut:
+    out_dir = Path(output_dir).expanduser() if output_dir else _default_output_dir()
+    try:
+        out_dir = out_dir.resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid_output_dir")
+
+    if not out_dir.exists() or not out_dir.is_dir():
+        return CardsCountOut(output_dir=str(out_dir), count=0)
+
+    try:
+        count = sum(1 for _ in out_dir.rglob("*.png"))
+        return CardsCountOut(output_dir=str(out_dir), count=count)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="internal_error") from e
+
+
+@app.post("/open-help", response_model=OpenHelpOut)
+def open_help() -> OpenHelpOut:
+    """
+    Open the local help file in the system browser.
+    Used by the Angular UI (e.g., F1).
+    """
+    try:
+        if _open_help_callback is not None:
+            _open_help_callback()
+            return OpenHelpOut(ok=True)
+
+        # Fallback for API-only usage (uvicorn without Toga app).
+        help_path = Path(__file__).resolve().parent / "resources" / "help.html"
+        ok = help_path.exists()
+        if ok:
+            try:
+                webbrowser.open(help_path.as_uri())
+            except Exception:
+                pass
+        return OpenHelpOut(ok=ok)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="internal_error") from e
+
+
 @app.post("/generate-batch", response_model=GenerateBatchOut)
 async def generate_batch(body: GenerateBatchIn) -> GenerateBatchOut:
     """
@@ -956,13 +1051,6 @@ async def email(body: EmailIn) -> EmailOut:
             )
         )
 
-    template: Optional[Image.Image] = None
-    signature: Optional[Image.Image] = None
-    if body.template_base64:
-        template = _pil_image_from_base64(body.template_base64).convert("RGBA")
-    if body.signature_base64:
-        signature = _pil_image_from_base64(body.signature_base64).convert("RGBA")
-
     out_dir = Path(body.output_dir).expanduser() if body.output_dir else _default_output_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -991,20 +1079,11 @@ async def email(body: EmailIn) -> EmailOut:
 
                     attach = attachment_path_for_id(idnum, out_dir=out_dir)
                     if not attach.exists():
-                        # Best-effort: generate if assets provided
-                        if template is None:
-                            skipped += 1
-                            results.append(EmailResult(index=i, result="skipped", message="missing attachment and no template provided"))
-                            continue
-                        canvas = generate_single_card(
-                            name=(m.name or "").strip(),
-                            id_number=idnum,
-                            date=(m.date or "").strip(),
-                            template=template,
-                            signature=signature,
-                            font_path=_DEFAULT_FONT_PATH,
+                        skipped += 1
+                        results.append(
+                            EmailResult(index=i, result="skipped", message="missing card file; create cards first")
                         )
-                        canvas.save(attach, format="PNG")
+                        continue
 
                     msg = build_message(
                         smtp=cfg,

@@ -40,6 +40,7 @@ type AssetSettingsOut = {
 };
 type ChooseAssetOut = { kind: 'template' | 'signature'; path?: string | null; base64?: string | null };
 type OpenPathOut = { ok: boolean };
+type OpenHelpOut = { ok: boolean };
 type EmailResult = { index: number; result: 'sent' | 'skipped' | 'error'; message?: string | null };
 type EmailOut = { total: number; sent: number; skipped: number; errors: number; results: EmailResult[] };
 type EmailProvider = 'microsoft' | 'gmail';
@@ -47,7 +48,6 @@ type OfficerRole = 'President' | 'Vice President' | 'Membership Officer';
 type EmailAccountSettings = {
   email: string;
   password: string;
-  save_password: boolean;
   from_name: string;
   subject_tpl: string;
   body_tpl: string;
@@ -66,12 +66,16 @@ type UnionManagementSettings = {
 };
 type EmailSettingsV2 = {
   active: EmailProvider;
+  active_sender: OfficerRole;
   microsoft: EmailAccountSettings;
   gmail: EmailAccountSettings;
+  microsoft_senders: Partial<Record<OfficerRole, EmailAccountSettings>>;
+  gmail_senders: Partial<Record<OfficerRole, EmailAccountSettings>>;
   union_management: UnionManagementSettings;
   defaults: Record<EmailProvider, EmailProviderDefaults>;
 };
 type ClearCardsOut = { output_dir: string; deleted: number };
+type CardsCountOut = { output_dir: string; count: number };
 
 @Component({
   selector: 'app-root',
@@ -108,6 +112,7 @@ export class App {
 
   protected readonly batchStatus = signal<string | null>(null);
   protected readonly batchResult = signal<GenerateBatchOut | null>(null);
+  protected readonly generatedCardCount = signal(0);
 
   protected readonly generateStatus = signal<string | null>(null);
   protected readonly lastGenerated = signal<GenerateOut | null>(null);
@@ -115,20 +120,21 @@ export class App {
   protected readonly settingsOpen = signal(false);
   protected readonly pendingSend = signal<'one' | 'batch' | null>(null);
   protected readonly emailActive = signal<EmailProvider>('microsoft');
+  protected readonly emailSender = signal<OfficerRole>('Membership Officer');
   protected readonly emailDefaults = signal<Record<EmailProvider, EmailProviderDefaults> | null>(null);
+  protected readonly msSenderProfiles = signal<Partial<Record<OfficerRole, EmailAccountSettings>>>({});
+  protected readonly gmailSenderProfiles = signal<Partial<Record<OfficerRole, EmailAccountSettings>>>({});
   protected readonly unionMgmtEnabled = signal(false);
   protected readonly unionMgmtEmail = signal('');
 
   protected readonly msEmail = signal('');
   protected readonly msPassword = signal('');
-  protected readonly msSavePassword = signal(false);
   protected readonly msFromName = signal('');
   protected readonly msSubjectTpl = signal('Your ID card, {name}');
   protected readonly msBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
 
   protected readonly gmailEmail = signal('');
   protected readonly gmailPassword = signal('');
-  protected readonly gmailSavePassword = signal(false);
   protected readonly gmailFromName = signal('');
   protected readonly gmailSubjectTpl = signal('Your ID card, {name}');
   protected readonly gmailBodyTpl = signal('Hi {name},\n\nAttached is your ID card.\nID: {id_number}\nDate: {date}\n\nBest,\n{sender}');
@@ -285,6 +291,7 @@ export class App {
   });
 
   protected readonly hasOutputFolder = computed(() => this.outputFolder().trim().length > 0);
+  protected readonly hasGeneratedCards = computed(() => this.generatedCardCount() > 0);
 
   protected readonly hasActiveEmailCreds = computed(() => {
     const emailAddr = this.currentEmail().trim();
@@ -310,6 +317,23 @@ export class App {
 
     await this.loadAssetDefaults();
     await this.loadEmailSettings();
+    await this.refreshCardCount();
+  }
+
+  private async refreshCardCount(): Promise<void> {
+    try {
+      const outDir = this.outputDir().trim();
+      if (!outDir) {
+        this.generatedCardCount.set(0);
+        return;
+      }
+      const resp = await firstValueFrom(
+        this.http.get<CardsCountOut>(`${this.apiBase}/cards/count`, { params: { output_dir: outDir } as any })
+      );
+      this.generatedCardCount.set(Number(resp?.count ?? 0) || 0);
+    } catch {
+      // ignore
+    }
   }
 
   protected async loadAssetDefaults(): Promise<void> {
@@ -370,13 +394,14 @@ export class App {
 
   protected onOutputDirChange(value: string): void {
     this.outputDir.set(value ?? '');
+    this.generatedCardCount.set(0);
   }
 
   protected async setDefaultOutputDir(enabled: boolean): Promise<void> {
     const current = this.outputDir().trim();
     if (enabled) {
       if (!current) {
-        this.error.set('Choose an output folder first.');
+        this.error.set('Choose a save folder first.');
         this.outputDefaultEnabled.set(false);
         return;
       }
@@ -386,7 +411,7 @@ export class App {
         );
         this.outputDefaultEnabled.set(true);
       } catch (e: any) {
-        const msg = e?.error?.detail || e?.message || 'Failed to save output folder default.';
+        const msg = e?.error?.detail || e?.message || 'Failed to save default save folder.';
         this.error.set(String(msg));
         this.outputDefaultEnabled.set(false);
       }
@@ -399,7 +424,7 @@ export class App {
       );
       this.outputDefaultEnabled.set(false);
     } catch (e: any) {
-      const msg = e?.error?.detail || e?.message || 'Failed to clear output folder default.';
+      const msg = e?.error?.detail || e?.message || 'Failed to clear default save folder.';
       this.error.set(String(msg));
     }
   }
@@ -415,9 +440,10 @@ export class App {
       const chosen = (resp?.output_dir ?? '').toString().trim();
       if (chosen) {
         this.outputDir.set(chosen);
+        await this.refreshCardCount();
       }
     } catch (e: any) {
-      const msg = e?.error?.detail || e?.message || 'Failed to choose output folder.';
+      const msg = e?.error?.detail || e?.message || 'Failed to choose save folder.';
       this.error.set(String(msg));
     } finally {
       this.isChoosingOutputDir.set(false);
@@ -591,7 +617,7 @@ export class App {
       this.members.set(merged);
       this.batchStatus.set(`Loaded ${incoming.length} member(s) from ${file.name}.`);
     } catch (e: any) {
-      const msg = e?.error?.detail || e?.message || 'Failed to upload CSV.';
+      const msg = e?.error?.detail || e?.message || 'Failed to load CSV.';
       this.error.set(String(msg));
     } finally {
       // Allow selecting the same file again (some browsers won't fire change otherwise).
@@ -730,7 +756,7 @@ export class App {
 
     const outDir = this.outputDir().trim();
     if (!outDir) {
-      this.error.set('Choose an output folder first.');
+      this.error.set('Choose a save folder first.');
       return;
     }
 
@@ -741,7 +767,7 @@ export class App {
     }
 
     this.isLoading.set(true);
-    this.batchStatus.set(`Generating ${chosen.length} card(s)...`);
+    this.batchStatus.set(`Creating ${chosen.length} card(s)...`);
     try {
       const payload = {
         members: chosen,
@@ -754,12 +780,15 @@ export class App {
         this.http.post<GenerateBatchOut>(`${this.apiBase}/generate-batch`, payload)
       );
       this.batchResult.set(resp);
+      // Optimistic: ensure Clear cards can enable even if /cards/count isn't available yet.
+      if ((resp?.ok ?? 0) > 0) this.generatedCardCount.set(Math.max(this.generatedCardCount(), Number(resp.ok) || 0));
+      await this.refreshCardCount();
       const outDirMsg = resp.output_dir ? ` Saved to: ${resp.output_dir}` : '';
       this.batchStatus.set(
         `Batch complete: ${resp.ok} saved, ${resp.skipped} skipped, ${resp.errors} errors.${outDirMsg}`
       );
     } catch (e: any) {
-      const msg = e?.error?.detail || e?.message || 'Failed to generate batch.';
+      const msg = e?.error?.detail || e?.message || 'Failed to create cards.';
       this.error.set(String(msg));
       this.batchStatus.set(String(msg));
     } finally {
@@ -785,7 +814,7 @@ export class App {
     }
 
     this.isLoading.set(true);
-    this.generateStatus.set('Generating card...');
+    this.generateStatus.set('Creating card...');
     try {
       const payload = {
         member: {
@@ -803,9 +832,11 @@ export class App {
         this.http.post<GenerateOut>(`${this.apiBase}/generate`, payload)
       );
       this.lastGenerated.set(resp);
+      this.generatedCardCount.set(Math.max(this.generatedCardCount(), 1));
+      await this.refreshCardCount();
       this.generateStatus.set(`Saved: ${resp.filename}`);
     } catch (e: any) {
-      const msg = e?.error?.detail || e?.message || 'Failed to generate card.';
+      const msg = e?.error?.detail || e?.message || 'Failed to create card.';
       this.error.set(String(msg));
       this.generateStatus.set(String(msg));
     } finally {
@@ -853,7 +884,7 @@ export class App {
     this.error.set(null);
     const folder = this.outputFolder().trim();
     if (!folder) {
-      this.error.set('Set an output folder first (or generate cards to establish one).');
+      this.error.set('Set a save folder first (or create cards to establish one).');
       return;
     }
     try {
@@ -925,20 +956,26 @@ export class App {
       this.emailDefaults.set(s.defaults ?? null);
       this.unionMgmtEnabled.set(!!s.union_management?.enabled);
       this.unionMgmtEmail.set((s.union_management?.email ?? '').toString());
+      this.emailSender.set((s.active_sender ?? 'Membership Officer') as OfficerRole);
+      this.msSenderProfiles.set((s.microsoft_senders ?? {}) as any);
+      this.gmailSenderProfiles.set((s.gmail_senders ?? {}) as any);
 
-      this.msEmail.set((s.microsoft?.email ?? '').toString());
-      this.msPassword.set((s.microsoft?.password ?? '').toString());
-      this.msSavePassword.set(!!s.microsoft?.save_password);
-      this.msFromName.set((s.microsoft?.from_name ?? '').toString());
-      this.msSubjectTpl.set((s.microsoft?.subject_tpl ?? this.msSubjectTpl()).toString());
-      this.msBodyTpl.set((s.microsoft?.body_tpl ?? this.msBodyTpl()).toString());
+      // Load the active sender profile for each provider (fallback to provider defaults).
+      const role = (s.active_sender ?? 'Membership Officer') as OfficerRole;
+      const msProfile = (s.microsoft_senders?.[role] ?? s.microsoft) as any;
+      const gmailProfile = (s.gmail_senders?.[role] ?? s.gmail) as any;
 
-      this.gmailEmail.set((s.gmail?.email ?? '').toString());
-      this.gmailPassword.set((s.gmail?.password ?? '').toString());
-      this.gmailSavePassword.set(!!s.gmail?.save_password);
-      this.gmailFromName.set((s.gmail?.from_name ?? '').toString());
-      this.gmailSubjectTpl.set((s.gmail?.subject_tpl ?? this.gmailSubjectTpl()).toString());
-      this.gmailBodyTpl.set((s.gmail?.body_tpl ?? this.gmailBodyTpl()).toString());
+      this.msEmail.set((msProfile?.email ?? '').toString());
+      this.msPassword.set((msProfile?.password ?? '').toString());
+      this.msFromName.set((msProfile?.from_name ?? '').toString());
+      this.msSubjectTpl.set((msProfile?.subject_tpl ?? this.msSubjectTpl()).toString());
+      this.msBodyTpl.set((msProfile?.body_tpl ?? this.msBodyTpl()).toString());
+
+      this.gmailEmail.set((gmailProfile?.email ?? '').toString());
+      this.gmailPassword.set((gmailProfile?.password ?? '').toString());
+      this.gmailFromName.set((gmailProfile?.from_name ?? '').toString());
+      this.gmailSubjectTpl.set((gmailProfile?.subject_tpl ?? this.gmailSubjectTpl()).toString());
+      this.gmailBodyTpl.set((gmailProfile?.body_tpl ?? this.gmailBodyTpl()).toString());
     } catch {
       // ignore; API may not be up yet
     }
@@ -948,12 +985,35 @@ export class App {
     this.settingsStatus.set(null);
     this.isSavingSettings.set(true);
     try {
+      const role = this.emailSender();
+      const nextMsProfiles: any = { ...(this.msSenderProfiles() ?? {}) };
+      const nextGmailProfiles: any = { ...(this.gmailSenderProfiles() ?? {}) };
+
+      // Save the current form values into the active sender profile.
+      const msProfile: EmailAccountSettings = {
+        email: this.msEmail().trim(),
+        password: this.msPassword(),
+        from_name: this.msFromName(),
+        subject_tpl: this.msSubjectTpl(),
+        body_tpl: this.msBodyTpl(),
+      };
+      const gmailProfile: EmailAccountSettings = {
+        email: this.gmailEmail().trim(),
+        password: this.gmailPassword(),
+        from_name: this.gmailFromName(),
+        subject_tpl: this.gmailSubjectTpl(),
+        body_tpl: this.gmailBodyTpl(),
+      };
+
+      nextMsProfiles[role] = msProfile;
+      nextGmailProfiles[role] = gmailProfile;
+
       const payload: EmailSettingsV2 = {
         active: this.emailActive(),
+        active_sender: role,
         microsoft: {
           email: this.msEmail().trim(),
           password: this.msPassword(),
-          save_password: this.msSavePassword(),
           from_name: this.msFromName(),
           subject_tpl: this.msSubjectTpl(),
           body_tpl: this.msBodyTpl(),
@@ -961,11 +1021,12 @@ export class App {
         gmail: {
           email: this.gmailEmail().trim(),
           password: this.gmailPassword(),
-          save_password: this.gmailSavePassword(),
           from_name: this.gmailFromName(),
           subject_tpl: this.gmailSubjectTpl(),
           body_tpl: this.gmailBodyTpl(),
         },
+        microsoft_senders: nextMsProfiles,
+        gmail_senders: nextGmailProfiles,
         union_management: {
           enabled: !!this.unionMgmtEnabled(),
           email: this.unionMgmtEmail().trim(),
@@ -975,6 +1036,9 @@ export class App {
 
       const resp = await firstValueFrom(this.http.put<EmailSettingsV2>(`${this.apiBase}/settings/email`, payload));
       if (resp?.defaults) this.emailDefaults.set(resp.defaults);
+      if (resp?.active_sender) this.emailSender.set(resp.active_sender as OfficerRole);
+      this.msSenderProfiles.set((resp?.microsoft_senders ?? nextMsProfiles) as any);
+      this.gmailSenderProfiles.set((resp?.gmail_senders ?? nextGmailProfiles) as any);
       this.settingsStatus.set('Saved.');
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to save settings.';
@@ -992,17 +1056,37 @@ export class App {
       'Membership Officer': 'membership.officer@cupe3523.ca',
     };
 
-    const addr = (OFFICER_EMAILS[role] || '').trim();
-    if (!addr) return;
+    this.emailSender.set(role);
+    this.settingsStatus.set(`Selected ${role}.`);
 
-    this.settingsStatus.set(`Applied ${role}.`);
+    const addr = (OFFICER_EMAILS[role] || '').trim();
 
     if (this.emailActive() === 'microsoft') {
-      this.msEmail.set(addr);
-      this.msFromName.set(role);
+      const profiles = this.msSenderProfiles() ?? {};
+      const p = (profiles as any)[role] as EmailAccountSettings | undefined;
+      if (p) {
+        this.msEmail.set((p.email ?? '').toString());
+        this.msPassword.set((p.password ?? '').toString());
+        this.msFromName.set((p.from_name ?? '').toString());
+        this.msSubjectTpl.set((p.subject_tpl ?? this.msSubjectTpl()).toString());
+        this.msBodyTpl.set((p.body_tpl ?? this.msBodyTpl()).toString());
+      } else {
+        if (addr) this.msEmail.set(addr);
+        this.msFromName.set(role);
+      }
     } else {
-      this.gmailEmail.set(addr);
-      this.gmailFromName.set(role);
+      const profiles = this.gmailSenderProfiles() ?? {};
+      const p = (profiles as any)[role] as EmailAccountSettings | undefined;
+      if (p) {
+        this.gmailEmail.set((p.email ?? '').toString());
+        this.gmailPassword.set((p.password ?? '').toString());
+        this.gmailFromName.set((p.from_name ?? '').toString());
+        this.gmailSubjectTpl.set((p.subject_tpl ?? this.gmailSubjectTpl()).toString());
+        this.gmailBodyTpl.set((p.body_tpl ?? this.gmailBodyTpl()).toString());
+      } else {
+        if (addr) this.gmailEmail.set(addr);
+        this.gmailFromName.set(role);
+      }
     }
   }
 
@@ -1035,7 +1119,7 @@ export class App {
 
     const outDir = this.outputDir().trim();
     if (!outDir) {
-      this.error.set('Choose an output folder first.');
+      this.error.set('Choose a save folder first.');
       return;
     }
 
@@ -1109,7 +1193,7 @@ export class App {
 
     const outDir = this.outputDir().trim();
     if (!outDir) {
-      this.error.set('Choose an output folder first.');
+      this.error.set('Choose a save folder first.');
       return;
     }
 
@@ -1225,7 +1309,7 @@ export class App {
       const msg =
         e?.error?.detail ||
         e?.message ||
-        'Failed to generate preview. Ensure the Python API is running.';
+        'Failed to create preview. Ensure the Python API is running.';
       this.error.set(String(msg));
       this.previewPngBase64.set(null);
     } finally {
@@ -1290,8 +1374,8 @@ export class App {
     try {
       const outputDir = this.outputDir().trim();
       if (!outputDir) {
-        this.error.set('Choose an output folder first.');
-        this.batchStatus.set('Choose an output folder first.');
+        this.error.set('Choose a save folder first.');
+        this.batchStatus.set('Choose a save folder first.');
         return;
       }
       const resp = await firstValueFrom(
@@ -1313,6 +1397,8 @@ export class App {
       this.previewPngBase64.set(null);
 
       this.batchStatus.set(`Cleared ${resp.deleted} card(s).`);
+      this.generatedCardCount.set(0);
+      await this.refreshCardCount();
       this.schedulePreview();
     } catch (e: any) {
       const msg = e?.error?.detail || e?.message || 'Failed to clear cards.';
@@ -1320,6 +1406,26 @@ export class App {
       this.batchStatus.set(String(msg));
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  protected onWindowKeydown(ev: KeyboardEvent): void {
+    // F1 should open help, even when focus is inside an input (WebView often eats app-level shortcuts).
+    const key = (ev.key || '').toLowerCase();
+    const isF1 = key === 'f1' || (ev as any).keyCode === 112;
+    if (!isF1) return;
+    try {
+      ev.preventDefault();
+      (ev as any).stopPropagation?.();
+    } catch {}
+    this.openHelp();
+  }
+
+  protected async openHelp(): Promise<void> {
+    try {
+      await firstValueFrom(this.http.post<OpenHelpOut>(`${this.apiBase}/open-help`, {}));
+    } catch {
+      this.error.set('Failed to open Help. Ensure the Python API is running.');
     }
   }
 }

@@ -21,12 +21,15 @@
   --uip-accent-hover: #15803d;
   --uip-accent-soft: #e8f7ee;
 
-  /* Banner gradient: subtle green → pale yellow to match the app background */
+  --uip-brand-blue: #0038d0;   /* CUPE logo blue */
+  --uip-brand-green: #88c038;  /* CUPE logo green */
+
+  /* Banner gradient: CUPE green → pale yellow to match the app background */
   --uip-brand-gradient: linear-gradient(
     90deg,
-    #e8f7ee 0%,
-    #e6fffb 38%,
-    #fff7ed 72%,
+    var(--uip-brand-green) 0%,
+    #e8f7ee 22%,
+    #fff7ed 68%,
     #fff9db 100%
   );
 

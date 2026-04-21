@@ -125,11 +125,14 @@ def test_email_settings_roundtrip(client: TestClient) -> None:
         assert payload["defaults"]["gmail"]["smtp_port"] == 587
 
         payload["active"] = "microsoft"
+        payload["active_sender"] = "President"
         payload["microsoft"]["email"] = "sender@example.com"
         payload["microsoft"]["password"] = "secret"
-        payload["microsoft"]["save_password"] = True
         payload["union_management"]["enabled"] = True
         payload["union_management"]["email"] = "ums@example.com"
+        payload["microsoft_senders"] = payload.get("microsoft_senders") or {}
+        payload["microsoft_senders"]["President"] = payload["microsoft_senders"].get("President") or payload["microsoft"]
+        payload["microsoft_senders"]["President"]["body_tpl"] = "Hi {name} - President"
 
         r2 = client.put("/settings/email", json=payload)
         assert r2.status_code == 200
@@ -138,10 +141,13 @@ def test_email_settings_roundtrip(client: TestClient) -> None:
         assert r3.status_code == 200
         data = r3.json()
         assert data["active"] == "microsoft"
+        assert data["active_sender"] == "President"
         assert data["microsoft"]["email"] == "sender@example.com"
-        assert data["microsoft"]["password"] == "secret"
+        # Passwords are never persisted.
+        assert data["microsoft"]["password"] == ""
         assert data["union_management"]["enabled"] is True
         assert data["union_management"]["email"] == "ums@example.com"
+        assert data["microsoft_senders"]["President"]["body_tpl"] == "Hi {name} - President"
         assert data["defaults"]["microsoft"]["smtp_server"] == "smtp.office365.com"
     finally:
         try:
@@ -309,6 +315,27 @@ def test_clear_cards_deletes_pngs_only(client: TestClient) -> None:
         assert not (td / "a.png").exists()
         assert (td / "b.txt").exists()
         assert not (sub / "c.png").exists()
+    finally:
+        try:
+            shutil.rmtree(td, ignore_errors=True)
+        except Exception:
+            pass
+
+
+def test_cards_count_counts_pngs_recursively(client: TestClient) -> None:
+    td = Path(__file__).resolve().parents[1] / ".tmp" / f"test-count-{uuid.uuid4().hex}"
+    sub = td / "sub"
+    sub.mkdir(parents=True, exist_ok=True)
+    try:
+        (td / "a.png").write_bytes(b"fake")
+        (td / "b.txt").write_text("keep", encoding="utf-8")
+        (sub / "c.png").write_bytes(b"fake")
+
+        r = client.get("/cards/count", params={"output_dir": str(td)})
+        assert r.status_code == 200
+        payload = r.json()
+        assert payload["output_dir"]
+        assert payload["count"] == 2
     finally:
         try:
             shutil.rmtree(td, ignore_errors=True)
