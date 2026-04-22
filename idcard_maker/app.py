@@ -422,7 +422,9 @@ class IDCardApp(toga.App):
         packaged_index = self._find_packaged_ui_index()
         if packaged_index is not None:
             self._log(f"Using packaged Angular UI: {packaged_index}")
-            return "http://127.0.0.1:8000/ui/"
+            url = "http://127.0.0.1:8000/"
+            self._log(f"Serving packaged UI from API: {url}")
+            return url
 
         # Last resort: serve a placeholder page over HTTP (WebView requires http/https).
         self._log("Using placeholder UI")

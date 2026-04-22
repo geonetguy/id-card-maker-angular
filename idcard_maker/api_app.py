@@ -78,9 +78,7 @@ def _safe_web_path(request_path: str) -> Path | None:
     return None
 
 
-@app.get("/ui/", include_in_schema=False)
-@app.get("/ui/{path:path}", include_in_schema=False)
-def ui(path: str = ""):
+def _serve_ui(path: str = ""):
     """
     Serve the packaged Angular UI.
 
@@ -103,6 +101,32 @@ def ui(path: str = ""):
     if index.exists():
         return FileResponse(index, media_type="text/html")
     raise HTTPException(status_code=404, detail="UI entrypoint not found")
+
+
+def register_ui_routes(_app: FastAPI) -> None:
+    """
+    Register UI routes *after* all API routes.
+
+    Starlette matches routes in registration order; the UI catch-all must be
+    last so it doesn't intercept API endpoints like /health and /preview.
+    """
+
+    def _root():
+        return _serve_ui("")
+
+    def _any(path: str):
+        return _serve_ui(path)
+
+    def _alias(path: str = ""):
+        return _serve_ui(path)
+
+    # Deployment: serve UI at server root so Angular asset paths load correctly.
+    _app.add_api_route("/", _root, methods=["GET"], include_in_schema=False)
+    _app.add_api_route("/{path:path}", _any, methods=["GET"], include_in_schema=False)
+
+    # Keep /ui/* as an alias (useful for debugging).
+    _app.add_api_route("/ui/", _alias, methods=["GET"], include_in_schema=False)
+    _app.add_api_route("/ui/{path:path}", _alias, methods=["GET"], include_in_schema=False)
 
 _DEFAULT_FONT_PATH: Optional[Path] = Path(__file__).resolve().parent / "resources" / "courbd.ttf"
 if not _DEFAULT_FONT_PATH.exists():
@@ -1170,3 +1194,7 @@ async def email(body: EmailIn) -> EmailOut:
         raise HTTPException(status_code=500, detail=f"internal_error: {type(e).__name__}") from e
 
     return EmailOut(total=len(body.members), sent=sent, skipped=skipped, errors=errors, results=results)
+
+
+# Register UI routes last so they don't shadow API routes.
+register_ui_routes(app)

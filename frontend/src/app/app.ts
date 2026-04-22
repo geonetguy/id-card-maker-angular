@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, HostListener, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgIf } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -1581,8 +1581,9 @@ export class App {
     }
   }
 
+  // F1 should open help, even when focus is inside an input.
+  @HostListener('window:keydown', ['$event'])
   protected onWindowKeydown(ev: KeyboardEvent): void {
-    // F1 should open help, even when focus is inside an input (WebView often eats app-level shortcuts).
     const key = (ev.key || '').toLowerCase();
     const isF1 = key === 'f1' || (ev as any).keyCode === 112;
     if (!isF1) return;
