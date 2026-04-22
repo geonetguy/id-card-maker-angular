@@ -1,2 +1,1 @@
-# idcard_maker/controllers/__init__.py
-from .actions import Actions
+# Legacy Toga controller layer removed (Angular + API is the UI path).

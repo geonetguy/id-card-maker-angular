@@ -62,7 +62,7 @@ requires = [
     "python-multipart>=0.0.9"
 ]
 
-# Bundle all runtime assets (template.png, stripe.png, courbd.ttf, logo.png, help.html, etc.)
+# Bundle all runtime assets (courbd.ttf, logo.png, help.html, etc.)
 resources = [
     "idcard_maker/resources/*"
 ]
