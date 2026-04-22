@@ -14,6 +14,7 @@ from concurrent.futures import Future
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from functools import partial
+from datetime import datetime
 
 import toga
 
@@ -26,6 +27,22 @@ from .core.resources import resource_path
 
 
 class IDCardApp(toga.App):
+    def _log_path(self) -> Path:
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home())
+        return base / "IDCardMaker" / "startup.log"
+
+    def _log(self, message: str) -> None:
+        try:
+            p = self._log_path()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                existing = p.read_text(encoding="utf-8")
+            except Exception:
+                existing = ""
+            p.write_text(existing + f"[{ts}] {message}\n", encoding="utf-8")
+        except Exception:
+            pass
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._static_httpd: ThreadingHTTPServer | None = None
@@ -254,45 +271,59 @@ class IDCardApp(toga.App):
             s.bind((host, 0))
             return int(s.getsockname()[1])
 
-    def _start_static_server(self, directory: Path, host: str = "127.0.0.1") -> str:
+    def _start_static_server(self, directory: Path, host: str | None = None) -> str:
         """
         Toga's WinForms WebView only accepts http/https URLs. Serve built Angular
         files from a local HTTP server when the dev server isn't running.
         """
         if self._static_port is not None and self._static_httpd is not None:
-            return f"http://{host}:{self._static_port}/"
+            h = host or "127.0.0.1"
+            return f"http://{h}:{self._static_port}/"
 
         if not directory.exists():
+            self._log(f"Static UI directory missing: {directory}")
             return "about:blank"
 
-        try:
-            port = self._find_free_port(host)
-            handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
-            httpd = ThreadingHTTPServer((host, port), handler)
-        except Exception:
-            return "about:blank"
-
-        def _run() -> None:
+        # Try common loopback hosts; some environments behave differently for IPv4/IPv6/localhost.
+        host_candidates = [h for h in [host, "127.0.0.1", "localhost", "::1"] if h]
+        last_error: Exception | None = None
+        for h in host_candidates:
             try:
-                httpd.serve_forever()
-            except Exception:
-                pass
+                port = self._find_free_port(h)
+                handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
+                httpd = ThreadingHTTPServer((h, port), handler)
+            except Exception as e:
+                last_error = e
+                continue
 
-        t = threading.Thread(target=_run, name="idcard-web-static", daemon=True)
-        t.start()
+            self._log(f"Starting static UI server: dir={directory} host={h} port={port}")
 
-        self._static_httpd = httpd
-        self._static_thread = t
-        self._static_port = port
+            def _run() -> None:
+                try:
+                    httpd.serve_forever()
+                except Exception as e:
+                    self._log(f"Static UI server crashed: {e!r}")
 
-        # Ensure the server socket is actually accepting connections before we
-        # hand the URL to WebView (prevents intermittent ERR_EMPTY_RESPONSE).
-        for _ in range(50):
-            if self._is_port_open(host, port, timeout_s=0.05):
-                break
-            time.sleep(0.02)
+            t = threading.Thread(target=_run, name="idcard-web-static", daemon=True)
+            t.start()
 
-        return f"http://{host}:{port}/"
+            self._static_httpd = httpd
+            self._static_thread = t
+            self._static_port = port
+
+            # Ensure the server socket is accepting connections before we hand URL to WebView.
+            for _ in range(80):
+                if self._is_port_open(h, port, timeout_s=0.05):
+                    break
+                time.sleep(0.02)
+
+            if h == "::1":
+                return f"http://[::1]:{port}/"
+            return f"http://{h}:{port}/"
+
+        if last_error is not None:
+            self._log(f"Failed to start static UI server: {last_error!r}")
+        return "about:blank"
 
     def _start_placeholder_ui(self, host: str = "127.0.0.1") -> str:
         """
@@ -335,24 +366,29 @@ class IDCardApp(toga.App):
     def _resolve_web_url(self) -> str:
         override = (os.environ.get("IDCARD_WEB_URL") or "").strip()
         if override and self._is_url_reachable(override):
+            self._log(f"Using IDCARD_WEB_URL override: {override}")
             return override
 
         # Prefer Angular dev server if running (npm start).
         dev_url = self._find_running_dev_server_url()
         if dev_url:
+            self._log(f"Using Angular dev server: {dev_url}")
             return dev_url
 
         # Fall back to local build output if present.
         dist_index = self._find_built_dist_index()
         if dist_index is not None:
+            self._log(f"Using built Angular dist: {dist_index}")
             return self._start_static_server(dist_index.parent)
 
         # Packaged UI (deployment build).
         packaged_index = self._find_packaged_ui_index()
         if packaged_index is not None:
+            self._log(f"Using packaged Angular UI: {packaged_index}")
             return self._start_static_server(packaged_index.parent)
 
         # Last resort: serve a placeholder page over HTTP (WebView requires http/https).
+        self._log("Using placeholder UI")
         return self._start_placeholder_ui()
 
     async def open_help(self, widget=None):
