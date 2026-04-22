@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
+from urllib.parse import urlparse
 import threading
 import time
 import tempfile
@@ -40,6 +41,25 @@ class IDCardApp(toga.App):
         try:
             with socket.create_connection((host, port), timeout=timeout_s):
                 return True
+        except Exception:
+            return False
+
+    def _is_url_reachable(self, url: str) -> bool:
+        """
+        Best-effort check that an http(s) URL is reachable.
+
+        This prevents bad environment overrides (like IDCARD_WEB_URL=http://127.0.0.1/)
+        from breaking the packaged app UI.
+        """
+        try:
+            p = urlparse(url)
+            if p.scheme not in {"http", "https"}:
+                return False
+            host = (p.hostname or "").strip()
+            if not host:
+                return False
+            port = int(p.port or (443 if p.scheme == "https" else 80))
+            return self._is_port_open(host, port, timeout_s=0.2)
         except Exception:
             return False
 
@@ -303,7 +323,7 @@ class IDCardApp(toga.App):
 
     def _resolve_web_url(self) -> str:
         override = (os.environ.get("IDCARD_WEB_URL") or "").strip()
-        if override:
+        if override and self._is_url_reachable(override):
             return override
 
         # Prefer Angular dev server if running (npm start).
