@@ -133,6 +133,11 @@
   justify-content: flex-end;
 }
 
+.membersSearch {
+  width: min(170px, 100%);
+  min-width: 140px;
+}
+
 .panel__banner .btn {
   padding: 8px 12px;
 }
@@ -622,6 +627,34 @@
   background: var(--uip-surface-alt);
   font-size: 12px;
   color: var(--uip-text-muted);
+}
+
+.sortHeader {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sortHeader:hover {
+  color: var(--uip-text);
+}
+
+.sortIcon {
+  font-size: 11px;
+  color: rgba(17, 24, 39, 0.45);
+}
+
+.table th[aria-sort="ascending"] .sortIcon,
+.table th[aria-sort="descending"] .sortIcon {
+  color: var(--uip-text);
 }
 
 .tableRow {

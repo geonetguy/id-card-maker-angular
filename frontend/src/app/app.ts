@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 type Member = {
   name: string;
   id_number: string;
+  employer_id: string;
   date: string;
   email: string;
 };
@@ -13,6 +14,8 @@ type Member = {
 type MemberRow = Member & { selected: boolean };
 
 type PageSize = 10 | 25 | 50 | 100 | 'all';
+type SortColumn = keyof Member;
+type SortDir = 'asc' | 'desc';
 
 type GenerateBatchResult = { index: number; result: 'ok' | 'skip' | 'error' };
 type GenerateBatchOut = {
@@ -110,7 +113,10 @@ export class App {
 
   protected readonly members = signal<MemberRow[]>([]);
   protected readonly selectedIndex = signal<number | null>(null);
-  protected readonly selectAll = signal(false);
+
+  protected readonly searchQuery = signal('');
+  protected readonly sortColumn = signal<SortColumn | null>(null);
+  protected readonly sortDir = signal<SortDir>('asc');
 
   protected readonly pageSize = signal<PageSize>(25);
   protected readonly pageIndex = signal(0); // 0-based
@@ -168,40 +174,84 @@ export class App {
 
   protected readonly selectedCount = computed(() => {
     const rows = this.members();
-    if (this.selectAll()) return rows.length;
     return rows.reduce((acc, r) => acc + (r.selected ? 1 : 0), 0);
   });
 
+  protected readonly viewMembers = computed(() => {
+    const rows = this.members();
+    const q = this.searchQuery().trim().toLowerCase();
+    let out: Array<{ index: number; row: MemberRow }> = rows.map((row, index) => ({ index, row }));
+
+    if (q) {
+      out = out.filter(({ row }) => {
+        const name = (row.name ?? '').toString().toLowerCase();
+        const idNum = (row.id_number ?? '').toString().toLowerCase();
+        const empId = (row.employer_id ?? '').toString().toLowerCase();
+        const date = (row.date ?? '').toString().toLowerCase();
+        const email = (row.email ?? '').toString().toLowerCase();
+        return name.includes(q) || idNum.includes(q) || empId.includes(q) || date.includes(q) || email.includes(q);
+      });
+    }
+
+    const col = this.sortColumn();
+    if (col) {
+      const dir = this.sortDir();
+      const mul = dir === 'asc' ? 1 : -1;
+      out = out
+        .slice()
+        .sort((a, b) => {
+          const av = (a.row[col] ?? '').toString();
+          const bv = (b.row[col] ?? '').toString();
+          const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+          return cmp !== 0 ? cmp * mul : a.index - b.index;
+        });
+    }
+
+    return out;
+  });
+
+  protected readonly viewAnySelected = computed(() => {
+    const v = this.viewMembers();
+    return v.some((x) => !!x.row.selected);
+  });
+
+  protected readonly viewAllSelected = computed(() => {
+    const v = this.viewMembers();
+    return v.length > 0 && v.every((x) => !!x.row.selected);
+  });
+
+  protected readonly viewIndeterminate = computed(() => this.viewAnySelected() && !this.viewAllSelected());
+
   protected readonly totalPages = computed(() => {
-    const total = this.members().length;
+    const total = this.viewMembers().length;
     const size = this.pageSize();
     if (size === 'all') return total > 0 ? 1 : 0;
     return total > 0 ? Math.max(1, Math.ceil(total / size)) : 0;
   });
 
   protected readonly pagedMembers = computed(() => {
-    const rows = this.members();
+    const rows = this.viewMembers();
     const total = rows.length;
     const size = this.pageSize();
     if (!total) return [] as Array<{ index: number; row: MemberRow }>;
-    if (size === 'all') return rows.map((row, index) => ({ index, row }));
+    if (size === 'all') return rows;
     const page = Math.max(0, this.pageIndex());
     const start = Math.min(total, page * size);
     const end = Math.min(total, start + size);
     const out: Array<{ index: number; row: MemberRow }> = [];
-    for (let i = start; i < end; i++) out.push({ index: i, row: rows[i] });
+    for (let i = start; i < end; i++) out.push(rows[i]);
     return out;
   });
 
   protected readonly selectedMembers = computed<Member[]>(() => {
     const rows = this.members();
-    const chosen = this.selectAll() ? rows : rows.filter((r) => r.selected);
-    return chosen.map(({ name, id_number, date, email }) => ({ name, id_number, date, email }));
+    const chosen = rows.filter((r) => r.selected);
+    return chosen.map(({ name, id_number, employer_id, date, email }) => ({ name, id_number, employer_id, date, email }));
   });
 
   protected readonly selectedRowsComplete = computed(() => {
     const rows = this.members();
-    const chosen = this.selectAll() ? rows : rows.filter((r) => r.selected);
+    const chosen = rows.filter((r) => r.selected);
     if (!chosen.length) return false;
     return chosen.every((m) => {
       return this.isRowValid(m);
@@ -209,7 +259,7 @@ export class App {
   });
 
   protected isWorkSelected(row: MemberRow): boolean {
-    return this.selectAll() || !!row.selected;
+    return !!row.selected;
   }
 
   protected isMissing(row: MemberRow, field: keyof Member): boolean {
@@ -290,6 +340,7 @@ export class App {
   }
 
   protected isInvalid(row: MemberRow, field: keyof Member): boolean {
+    if (field === 'employer_id') return false;
     const raw = (row[field] ?? '').toString();
     const v = raw.trim();
     if (!v) return true;
@@ -364,6 +415,48 @@ export class App {
     this.pageSize.set(next);
     this.pageIndex.set(0);
     this.clampPagination();
+  }
+
+  protected onSearchChange(value: string): void {
+    this.searchQuery.set((value ?? '').toString());
+    this.pageIndex.set(0);
+    this.clampPagination();
+  }
+
+  protected toggleSort(col: SortColumn): void {
+    const current = this.sortColumn();
+    if (current !== col) {
+      this.sortColumn.set(col);
+      this.sortDir.set('asc');
+    } else if (this.sortDir() === 'asc') {
+      this.sortDir.set('desc');
+    } else {
+      this.sortColumn.set(null);
+      this.sortDir.set('asc');
+    }
+    this.pageIndex.set(0);
+    this.clampPagination();
+  }
+
+  protected sortIndicator(col: SortColumn): string {
+    if (this.sortColumn() !== col) return '↕';
+    return this.sortDir() === 'asc' ? '▲' : '▼';
+  }
+
+  protected ariaSort(col: SortColumn): string | null {
+    if (this.sortColumn() !== col) return 'none';
+    return this.sortDir() === 'asc' ? 'ascending' : 'descending';
+  }
+
+  protected toggleSelectAllVisible(enabled: boolean): void {
+    const view = this.viewMembers();
+    if (!view.length) return;
+    const rows = this.members();
+    const next = rows.slice();
+    for (const { index } of view) {
+      if (index >= 0 && index < next.length) next[index] = { ...next[index], selected: !!enabled };
+    }
+    this.members.set(next);
   }
 
   protected prevPage(): void {
@@ -665,12 +758,12 @@ export class App {
       const incomingRows: MemberRow[] = incoming.map((m) => ({
         name: m.name ?? '',
         id_number: this.normalizeIdNumber(m.id_number ?? ''),
+        employer_id: ((m as any).employer_id ?? '').toString(),
         date: m.date ?? '',
         email: m.email ?? '',
         selected: true,
       }));
       const merged = [...this.members(), ...incomingRows].map((r) => ({ ...r, selected: true }));
-      this.selectAll.set(true);
       this.members.set(merged);
       this.pageIndex.set(0);
       this.clampPagination();
@@ -700,7 +793,7 @@ export class App {
 
   protected addMemberRow(): void {
     const rows = this.members();
-    const next: MemberRow = { name: '', id_number: '', date: '', email: '', selected: true };
+    const next: MemberRow = { name: '', id_number: '', employer_id: '', date: '', email: '', selected: true };
     const updated = [...rows, next];
     this.members.set(updated);
     this.selectRow(updated.length - 1);
@@ -735,12 +828,7 @@ export class App {
   }
 
   protected toggleSelectAll(enabled: boolean): void {
-    this.selectAll.set(!!enabled);
-    const rows = this.members();
-    if (!rows.length) return;
-    const next = rows.map((r) => ({ ...r, selected: !!enabled }));
-    this.members.set(next);
-    this.clampPagination();
+    this.toggleSelectAllVisible(!!enabled);
   }
 
   protected toggleRowSelected(index: number, enabled: boolean): void {
@@ -749,9 +837,6 @@ export class App {
     const next = rows.slice();
     next[index] = { ...next[index], selected: !!enabled };
     this.members.set(next);
-
-    // If any row is deselected, Select All becomes false.
-    if (!enabled && this.selectAll()) this.selectAll.set(false);
   }
 
   protected updateRowField(index: number, field: keyof Member, value: string): void {
@@ -788,6 +873,7 @@ export class App {
     const member: MemberRow = {
       name: this.name().trim(),
       id_number: this.idNumber().trim(),
+      employer_id: '',
       date: this.date().trim(),
       email: this.email().trim(),
       selected: true,
@@ -960,7 +1046,7 @@ export class App {
 
   protected exportCsv(): void {
     const rows = this.members();
-    const headers = ['name', 'id_number', 'date', 'email'];
+    const headers = ['name', 'id_number', 'employer_id', 'date', 'email'];
 
     const esc = (v: string) => {
       const s = (v ?? '').toString();
@@ -971,7 +1057,7 @@ export class App {
     const lines: string[] = [];
     lines.push(headers.join(','));
     for (const r of rows) {
-      lines.push([r.name, r.id_number, r.date, r.email].map(esc).join(','));
+      lines.push([r.name, r.id_number, r.employer_id, r.date, r.email].map(esc).join(','));
     }
 
     const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
@@ -1447,7 +1533,6 @@ export class App {
 
       // Reset UI state (keep template/signature + output dir settings).
       this.members.set([]);
-      this.selectAll.set(false);
       this.selectedIndex.set(null);
       this.name.set('');
       this.idNumber.set('');

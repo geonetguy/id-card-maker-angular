@@ -135,8 +135,22 @@
 
       <section class="panel panel--table">
         <div class="panel__banner">
-          <h2>Members ({{ members().length }})</h2>
+          <h2>
+            Members ({{
+              searchQuery().trim().length
+                ? (viewMembers().length + ' / ' + members().length)
+                : members().length
+            }})
+          </h2>
           <div class="panel__bannerActions">
+            <input
+              class="input membersSearch"
+              placeholder="Search"
+              [value]="searchQuery()"
+              (input)="onSearchChange($any($event.target).value)"
+              [disabled]="isLoading() || members().length === 0"
+              title="Search by name, ID number, date, or email"
+            />
             <button class="btn btn--secondary" (click)="addMemberRow()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder()" title="Add a new empty member row">Add member</button>
             <button class="btn btn--secondary" (click)="generateBatch()" [disabled]="isLoading() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()" title="Create ID cards for checked rows">Create card(s)</button>
             <button class="btn btn--secondary" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()" title="Email ID cards for checked rows">Email card(s)</button>
@@ -235,21 +249,47 @@
                   <label class="checkbox checkbox--table">
                     <input
                       type="checkbox"
-                      [checked]="selectAll()"
-                      [disabled]="members().length === 0"
+                      [checked]="viewAllSelected()"
+                      [indeterminate]="viewIndeterminate()"
+                      [disabled]="viewMembers().length === 0"
                       (change)="toggleSelectAll($any($event.target).checked)"
                     />
                   </label>
                 </th>
-                <th>Name <span class="reqMark" aria-hidden="true">*</span></th>
-                <th>ID Number <span class="reqMark" aria-hidden="true">*</span></th>
-                <th>Date <span class="reqMark" aria-hidden="true">*</span></th>
-                <th>Email <span class="reqMark" aria-hidden="true">*</span></th>
+                <th [attr.aria-sort]="ariaSort('name')">
+                  <button class="sortHeader" type="button" (click)="toggleSort('name')" title="Sort by Name">
+                    Name <span class="sortIcon">{{ sortIndicator('name') }}</span>
+                  </button>
+                  <span class="reqMark" aria-hidden="true">*</span>
+                </th>
+                <th [attr.aria-sort]="ariaSort('id_number')">
+                  <button class="sortHeader" type="button" (click)="toggleSort('id_number')" title="Sort by ID Number">
+                    ID Number <span class="sortIcon">{{ sortIndicator('id_number') }}</span>
+                  </button>
+                  <span class="reqMark" aria-hidden="true">*</span>
+                </th>
+                <th [attr.aria-sort]="ariaSort('employer_id')">
+                  <button class="sortHeader" type="button" (click)="toggleSort('employer_id')" title="Sort by Employer ID">
+                    Employer ID <span class="sortIcon">{{ sortIndicator('employer_id') }}</span>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="ariaSort('date')">
+                  <button class="sortHeader" type="button" (click)="toggleSort('date')" title="Sort by Date">
+                    Date <span class="sortIcon">{{ sortIndicator('date') }}</span>
+                  </button>
+                  <span class="reqMark" aria-hidden="true">*</span>
+                </th>
+                <th [attr.aria-sort]="ariaSort('email')">
+                  <button class="sortHeader" type="button" (click)="toggleSort('email')" title="Sort by Email">
+                    Email <span class="sortIcon">{{ sortIndicator('email') }}</span>
+                  </button>
+                  <span class="reqMark" aria-hidden="true">*</span>
+                </th>
                 <th class="colActions"></th>
               </tr>
             </thead>
             <tbody>
-              @if (members().length) {
+              @if (viewMembers().length) {
                 @for (item of pagedMembers(); track trackIndex(item.index)) {
                   <tr
                     class="tableRow"
@@ -280,6 +320,13 @@
                         [class.tableCellInput--invalid]="isWorkSelected(item.row) && isInvalid(item.row, 'id_number')"
                         [value]="item.row.id_number"
                         (input)="updateRowField(item.index, 'id_number', $any($event.target).value)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="tableCellInput"
+                        [value]="item.row.employer_id"
+                        (input)="updateRowField(item.index, 'employer_id', $any($event.target).value)"
                       />
                     </td>
                     <td>
@@ -320,6 +367,7 @@
           </table>
         </div>
         <div class="empty" *ngIf="members().length === 0">Load a CSV or add a member to populate the table.</div>
+        <div class="empty" *ngIf="members().length > 0 && viewMembers().length === 0">No matching members found.</div>
       </section>
     </div>
   </div>
