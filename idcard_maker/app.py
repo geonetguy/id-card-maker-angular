@@ -418,11 +418,11 @@ class IDCardApp(toga.App):
             self._log(f"Using built Angular dist: {dist_index}")
             return self._start_static_server(dist_index.parent)
 
-        # Packaged UI (deployment build).
+        # Packaged UI (deployment build) served by the in-process API server.
         packaged_index = self._find_packaged_ui_index()
         if packaged_index is not None:
             self._log(f"Using packaged Angular UI: {packaged_index}")
-            return self._start_static_server(packaged_index.parent)
+            return "http://127.0.0.1:8000/ui/"
 
         # Last resort: serve a placeholder page over HTTP (WebView requires http/https).
         self._log("Using placeholder UI")
@@ -466,6 +466,12 @@ class IDCardApp(toga.App):
 
         # Start backend API in-process (no business logic duplication in Angular).
         self._start_api_server()
+
+        # Wait briefly for the API server to accept connections (prevents WebView loading too early).
+        for _ in range(120):
+            if self._is_port_open("127.0.0.1", 8000, timeout_s=0.05):
+                break
+            time.sleep(0.02)
 
         # Help (opens system browser)
         self.commands.add(

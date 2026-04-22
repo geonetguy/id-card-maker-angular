@@ -58,6 +58,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------------------------
+# Packaged Angular UI (served from inside the app bundle)
+# ---------------------------------------------------------------------------
+
+_WEB_DIR = Path(__file__).resolve().parent / "resources" / "web"
+
+
+def _safe_web_path(request_path: str) -> Path | None:
+    if not _WEB_DIR.exists():
+        return None
+    p = (request_path or "").lstrip("/")
+    try:
+        candidate = (_WEB_DIR / p).resolve()
+        if candidate == _WEB_DIR or _WEB_DIR in candidate.parents:
+            return candidate
+    except Exception:
+        return None
+    return None
+
+
+@app.get("/ui/", include_in_schema=False)
+@app.get("/ui/{path:path}", include_in_schema=False)
+def ui(path: str = ""):
+    """
+    Serve the packaged Angular UI.
+
+    This is used by the desktop shell (Toga WebView) in deployment builds so we
+    don't rely on a separate Python HTTP server, and we avoid loopback/proxy
+    issues.
+    """
+    base = _safe_web_path(path)
+    if base is None:
+        raise HTTPException(status_code=404, detail="UI not bundled")
+
+    if base.exists() and base.is_dir():
+        base = base / "index.html"
+
+    # Serve file if present; otherwise fall back to SPA entrypoint.
+    if base.exists() and base.is_file():
+        return FileResponse(base)
+
+    index = _WEB_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index, media_type="text/html")
+    raise HTTPException(status_code=404, detail="UI entrypoint not found")
+
 _DEFAULT_FONT_PATH: Optional[Path] = Path(__file__).resolve().parent / "resources" / "courbd.ttf"
 if not _DEFAULT_FONT_PATH.exists():
     _DEFAULT_FONT_PATH = None
