@@ -1071,6 +1071,30 @@ export class App {
     URL.revokeObjectURL(url);
   }
 
+  protected unloadMembers(): void {
+    this.error.set(null);
+    this.warning.set(null);
+    this.batchResult.set(null);
+    this.emailResult.set(null);
+    this.emailStatus.set(null);
+
+    this.members.set([]);
+    this.selectedIndex.set(null);
+    this.name.set('');
+    this.idNumber.set('');
+    this.date.set('');
+    this.email.set('');
+    this.previewPngBase64.set(null);
+
+    this.searchQuery.set('');
+    this.sortColumn.set(null);
+    this.sortDir.set('asc');
+    this.pageIndex.set(0);
+    this.clampPagination();
+
+    this.batchStatus.set('Members unloaded.');
+  }
+
   protected onSmtpChange(): void {}
   protected onEmailTplChange(): void {}
 

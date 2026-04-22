@@ -156,6 +156,7 @@
             <button class="btn btn--secondary" (click)="sendEmailBatch()" [disabled]="isLoading() || isEmailing() || !assetsReady() || !hasOutputFolder() || !selectedRowsComplete()" title="Email ID cards for checked rows">Email card(s)</button>
             <button class="btn btn--secondary" (click)="openOutputFolder()" [disabled]="isLoading() || !hasOutputFolder()" title="Open the save folder">Open folder</button>
             <button class="btn btn--secondary" (click)="exportCsv()" [disabled]="isLoading() || members().length === 0" title="Save the current members list as a CSV file">Export CSV</button>
+            <button class="btn btn--secondary" (click)="unloadMembers()" [disabled]="isLoading() || members().length === 0" title="Remove all members from the table">Unload members</button>
             <button class="btn btn--secondary" (click)="clearCards()" [disabled]="isLoading() || !hasGeneratedCards()" title="Delete saved ID cards from the save folder">
               {{ clearConfirm() ? 'Click again to confirm (6s)' : 'Clear cards' }}
             </button>
@@ -210,7 +211,7 @@
           <div class="row row--wrap" *ngIf="members().length">
             <label class="label">Rows shown</label>
             <select
-              class="input"
+              class="input pageSizeSelect"
               [value]="pageSize()"
               (change)="onPageSizeChange($any($event.target).value)"
               [disabled]="isLoading()"
