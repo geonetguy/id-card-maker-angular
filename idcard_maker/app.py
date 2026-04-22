@@ -93,6 +93,16 @@ class IDCardApp(toga.App):
                     return dist_index
         return None
 
+    def _find_packaged_ui_index(self) -> Path | None:
+        """
+        Find a packaged Angular UI (copied into resources/web during packaging).
+        """
+        try:
+            p = resource_path(self, "web/index.html")
+            return p if p.exists() else None
+        except Exception:
+            return None
+
     def _start_api_server(self, host: str = "127.0.0.1", port: int = 8000) -> None:
         """
         Start the FastAPI server (uvicorn) in a background thread.
@@ -305,6 +315,11 @@ class IDCardApp(toga.App):
         dist_index = self._find_built_dist_index()
         if dist_index is not None:
             return self._start_static_server(dist_index.parent)
+
+        # Packaged UI (deployment build).
+        packaged_index = self._find_packaged_ui_index()
+        if packaged_index is not None:
+            return self._start_static_server(packaged_index.parent)
 
         # Last resort: serve a placeholder page over HTTP (WebView requires http/https).
         return self._start_placeholder_ui()

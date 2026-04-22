@@ -63,6 +63,9 @@ linux/
 # ID cards output
 generated_cards/
 
+# Bundled Angular build output (generated during packaging)
+idcard_maker/resources/web/
+
 # Temp files
 *.tmp
 

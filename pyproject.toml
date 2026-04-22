@@ -39,7 +39,7 @@ where = ["."]
 include = ["idcard_maker*"]
 
 [tool.setuptools.package-data]
-idcard_maker = ["resources/*"]
+idcard_maker = ["resources/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -64,7 +64,7 @@ requires = [
 
 # Bundle all runtime assets (courbd.ttf, logo.png, help.html, etc.)
 resources = [
-    "idcard_maker/resources/*"
+    "idcard_maker/resources/**"
 ]
 
 # Optional: point to a base icon name; Briefcase will pick platform variants if present.
