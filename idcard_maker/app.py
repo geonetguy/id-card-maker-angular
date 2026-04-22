@@ -406,6 +406,15 @@ class IDCardApp(toga.App):
             self._log(f"Using IDCARD_WEB_URL override: {override}")
             return override
 
+        # Deployment build: if the packaged UI exists, skip dev-server probing.
+        # The dev probe can take ~5s when no dev server is running (port scans).
+        packaged_index = self._find_packaged_ui_index()
+        if packaged_index is not None:
+            self._log(f"Using packaged Angular UI: {packaged_index}")
+            url = "http://127.0.0.1:8000/"
+            self._log(f"Serving packaged UI from API: {url}")
+            return url
+
         # Prefer Angular dev server if running (npm start).
         dev_url = self._find_running_dev_server_url()
         if dev_url:
@@ -417,14 +426,6 @@ class IDCardApp(toga.App):
         if dist_index is not None:
             self._log(f"Using built Angular dist: {dist_index}")
             return self._start_static_server(dist_index.parent)
-
-        # Packaged UI (deployment build) served by the in-process API server.
-        packaged_index = self._find_packaged_ui_index()
-        if packaged_index is not None:
-            self._log(f"Using packaged Angular UI: {packaged_index}")
-            url = "http://127.0.0.1:8000/"
-            self._log(f"Serving packaged UI from API: {url}")
-            return url
 
         # Last resort: serve a placeholder page over HTTP (WebView requires http/https).
         self._log("Using placeholder UI")
