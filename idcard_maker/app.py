@@ -15,6 +15,7 @@ from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from functools import partial
 from datetime import datetime
+import http.client
 
 import toga
 
@@ -285,7 +286,7 @@ class IDCardApp(toga.App):
             return "about:blank"
 
         # Try common loopback hosts; some environments behave differently for IPv4/IPv6/localhost.
-        host_candidates = [h for h in [host, "127.0.0.1", "localhost", "::1"] if h]
+        host_candidates = [h for h in [host, "127.0.0.1", "::1"] if h]
         last_error: Exception | None = None
         for h in host_candidates:
             try:
@@ -317,9 +318,45 @@ class IDCardApp(toga.App):
                     break
                 time.sleep(0.02)
 
-            if h == "::1":
-                return f"http://[::1]:{port}/"
-            return f"http://{h}:{port}/"
+            # Probe actual HTTP response. If it fails, try another host binding.
+            def _probe(hostname: str) -> bool:
+                try:
+                    conn = http.client.HTTPConnection(hostname, port, timeout=0.5)
+                    conn.request("GET", "/")
+                    resp = conn.getresponse()
+                    ok = 200 <= int(resp.status) < 500
+                    try:
+                        resp.read(64)
+                    except Exception:
+                        pass
+                    conn.close()
+                    return ok
+                except Exception as e:
+                    self._log(f"Probe failed for {hostname}:{port}: {e!r}")
+                    return False
+
+            # Prefer localhost in the URL (often bypasses proxy settings in embedded browsers).
+            if h != "::1" and _probe("localhost"):
+                url = f"http://localhost:{port}/"
+                self._log(f"Serving UI at: {url}")
+                return url
+            if h == "::1" and _probe("::1"):
+                url = f"http://[::1]:{port}/"
+                self._log(f"Serving UI at: {url}")
+                return url
+            if h != "::1" and _probe(h):
+                url = f"http://{h}:{port}/"
+                self._log(f"Serving UI at: {url}")
+                return url
+
+            try:
+                httpd.shutdown()
+            except Exception:
+                pass
+            self._static_httpd = None
+            self._static_thread = None
+            self._static_port = None
+            self._log("Static UI server started but did not respond; trying another host")
 
         if last_error is not None:
             self._log(f"Failed to start static UI server: {last_error!r}")
