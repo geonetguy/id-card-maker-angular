@@ -265,9 +265,12 @@ class IDCardApp(toga.App):
         if not directory.exists():
             return "about:blank"
 
-        port = self._find_free_port(host)
-        handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
-        httpd = ThreadingHTTPServer((host, port), handler)
+        try:
+            port = self._find_free_port(host)
+            handler = partial(SimpleHTTPRequestHandler, directory=str(directory))
+            httpd = ThreadingHTTPServer((host, port), handler)
+        except Exception:
+            return "about:blank"
 
         def _run() -> None:
             try:
@@ -281,6 +284,14 @@ class IDCardApp(toga.App):
         self._static_httpd = httpd
         self._static_thread = t
         self._static_port = port
+
+        # Ensure the server socket is actually accepting connections before we
+        # hand the URL to WebView (prevents intermittent ERR_EMPTY_RESPONSE).
+        for _ in range(50):
+            if self._is_port_open(host, port, timeout_s=0.05):
+                break
+            time.sleep(0.02)
+
         return f"http://{host}:{port}/"
 
     def _start_placeholder_ui(self, host: str = "127.0.0.1") -> str:
