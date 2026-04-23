@@ -179,6 +179,7 @@ def _default_output_dir() -> Path:
 class MemberIn(BaseModel):
     name: str = ""
     id_number: str = Field(..., min_length=1)
+    employer_id: str = ""
     date: str = ""
     email: str = ""
 
@@ -191,6 +192,7 @@ class MemberLooseIn(BaseModel):
 
     name: str = ""
     id_number: str = ""
+    employer_id: str = ""
     date: str = ""
     email: str = ""
 
@@ -1116,6 +1118,7 @@ async def email(body: EmailIn) -> EmailOut:
             MemberLooseIn(
                 name=mv["name"],
                 id_number=mv["id_number"],
+                employer_id=(getattr(m, "employer_id", "") or "").strip(),
                 date=mv["date"],
                 email=mv["email"],
             )
@@ -1128,6 +1131,7 @@ async def email(body: EmailIn) -> EmailOut:
         safe = {
             "name": (m.name or "").strip(),
             "id_number": (m.id_number or "").strip(),
+            "employer_id": (getattr(m, "employer_id", "") or "").strip(),
             "date": (m.date or "").strip(),
             "email": (m.email or "").strip(),
             "sender": cfg.from_name or cfg.from_email,
